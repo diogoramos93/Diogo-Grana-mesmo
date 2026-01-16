@@ -1,7 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { Quote, PhotographerProfile, Client, QuoteStatus } from '../types';
-import { Camera, CheckCircle, Download, ExternalLink, ShieldCheck, MapPin, Mail, Phone } from 'lucide-react';
+import { Download, CheckCircle, ShieldCheck } from 'lucide-react';
+import { generateQuotePDF } from '../services/pdfService';
 
 interface PublicQuoteViewProps {
   quoteId: string;
@@ -16,16 +17,16 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
   const [approved, setApproved] = useState(false);
 
   useEffect(() => {
-    // Simulate loading data from user-specific bucket
     const quotesData = localStorage.getItem(`photo_quotes_${userId}`);
     const profileData = localStorage.getItem(`photo_profile_${userId}`);
     const clientsData = localStorage.getItem(`photo_clients_${userId}`);
 
     if (quotesData && profileData && clientsData) {
       const quotes: Quote[] = JSON.parse(quotesData);
-      const foundQuote = quotes.find(q => q.id === quoteId);
+      const foundIndex = quotes.findIndex(q => q.id === quoteId);
       
-      if (foundQuote) {
+      if (foundIndex !== -1) {
+        const foundQuote = quotes[foundIndex];
         setQuote(foundQuote);
         setProfile(JSON.parse(profileData));
         const clients: Client[] = JSON.parse(clientsData);
@@ -34,6 +35,12 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
         if (foundQuote.status === QuoteStatus.APPROVED) {
           setApproved(true);
         }
+
+        if (foundQuote.status === QuoteStatus.SENT || foundQuote.status === QuoteStatus.DRAFT) {
+           const updatedQuotes = [...quotes];
+           updatedQuotes[foundIndex] = { ...foundQuote, status: QuoteStatus.VIEWED };
+           localStorage.setItem(`photo_quotes_${userId}`, JSON.stringify(updatedQuotes));
+        }
       }
     }
     setLoading(false);
@@ -41,9 +48,6 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
 
   const handleApprove = () => {
     if (!quote) return;
-    
-    // In a real app, this would update the database
-    // Here we update the localStorage of the user
     const quotesData = localStorage.getItem(`photo_quotes_${userId}`);
     if (quotesData) {
       const quotes: Quote[] = JSON.parse(quotesData);
@@ -52,23 +56,27 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
       );
       localStorage.setItem(`photo_quotes_${userId}`, JSON.stringify(updated));
     }
-    
     setApproved(true);
-    alert('Orçamento aprovado com sucesso! O fotógrafo será notificado.');
+  };
+
+  const handleDownloadPDF = () => {
+    if (quote && profile && client) {
+      generateQuotePDF(quote, profile, client);
+    }
   };
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
     </div>
   );
 
-  if (!quote || !profile) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-      <div className="max-w-md bg-white p-8 rounded-3xl shadow-lg">
+  if (!quote || !profile || !client) return (
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-center">
+      <div className="max-w-md bg-white p-8 rounded-3xl shadow-lg border border-slate-200">
         <h1 className="text-2xl font-bold text-slate-800 mb-4">Orçamento não encontrado</h1>
         <p className="text-slate-500">Este link pode ter expirado ou o orçamento foi removido.</p>
       </div>
@@ -76,167 +84,152 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 px-4 md:px-8">
-      <div className="max-w-4xl w-full">
-        {/* Header Publico */}
-        <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg shadow-indigo-100">
-              <Camera size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">FocusQuote</h1>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Visualização do Cliente</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-100 py-10 px-4 md:py-16 flex flex-col items-center selection:bg-indigo-100">
+      
+      <div className="w-full max-w-[210mm] space-y-6">
+        
+        {/* Barra de Ações (Escondida no Print) */}
+        <div className="flex justify-between items-center no-print px-4">
+          <button 
+            onClick={handleDownloadPDF}
+            className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-lg shadow-indigo-200 transition active:scale-95"
+          >
+            <Download size={18} />
+            <span>⬇️ Baixar PDF</span>
+          </button>
+          
           {approved && (
-            <div className="bg-emerald-50 text-emerald-700 px-6 py-2 rounded-full border border-emerald-100 flex items-center space-x-2 font-bold animate-bounce">
+            <div className="flex items-center space-x-2 text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-100">
               <CheckCircle size={20} />
-              <span>Orçamento Aprovado</span>
+              <span>Aprovado</span>
             </div>
           )}
         </div>
 
-        {/* Card Principal do Orçamento */}
-        <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden flex flex-col">
-          {/* Top Banner */}
-          <div className="bg-indigo-900 p-8 md:p-12 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
-            <div className="space-y-2">
-              <h2 className="text-4xl font-black">{profile.studioName || profile.name}</h2>
-              <div className="flex flex-wrap gap-4 text-indigo-200 text-sm">
-                <span className="flex items-center space-x-1"><Phone size={14} /> <span>{profile.phone}</span></span>
-                <span className="flex items-center space-x-1"><Mail size={14} /> <span>{profile.email}</span></span>
+        {/* Card do Orçamento (A4 Digital) */}
+        <div id="pdf-content" className="bg-white rounded-xl border border-slate-200 shadow-xl p-12 md:p-20 overflow-hidden text-[#1e293b]">
+          
+          {/* Header Section */}
+          <div className="flex justify-between items-start gap-10">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-[#4f46e5] mb-2 leading-tight">
+                {profile.studioName || profile.name}
+              </h1>
+              <div className="text-[14px] text-[#475569] space-y-0.5">
+                <p>{profile.name}</p>
+                <p>CNPJ/CPF: {profile.taxId}</p>
+                <p>{profile.address}</p>
+                <p>{profile.phone}</p>
               </div>
             </div>
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 text-right min-w-[200px]">
-              <p className="text-indigo-300 text-xs font-bold uppercase mb-1">Total do Orçamento</p>
-              <p className="text-3xl font-black">{formatCurrency(quote.total)}</p>
-              <p className="text-[10px] text-indigo-300 mt-2">Válido até {new Date(quote.validUntil).toLocaleDateString('pt-BR')}</p>
+            <div className="text-right">
+              <h2 className="text-2xl font-bold text-[#1e293b] leading-none mb-1">ORÇAMENTO</h2>
+              <p className="font-bold text-[#1e293b]"><strong>#{quote.number}</strong></p>
+              <div className="text-[12px] text-[#475569] mt-4 leading-tight">
+                <p>Emissão: {new Date(quote.date).toLocaleDateString('pt-BR')}</p>
+                <p>Vencimento: {new Date(quote.validUntil).toLocaleDateString('pt-BR')}</p>
+              </div>
             </div>
           </div>
 
-          <div className="p-8 md:p-12 space-y-12">
-            {/* Infos Cliente */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="h-px bg-[#e2e8f0] w-full my-8"></div>
+
+          {/* Client & Status Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 justify-between gap-10 mb-10">
+            <div>
+              <h3 className="text-[12px] font-bold uppercase tracking-[1px] text-[#4f46e5] mb-3">Cliente</h3>
               <div>
-                <h3 className="text-xs font-bold text-indigo-600 uppercase mb-4 tracking-widest">Para</h3>
-                <p className="text-2xl font-bold text-slate-800">{client?.name}</p>
-                <p className="text-slate-500 mt-1">{client?.address}</p>
-              </div>
-              <div className="md:text-right">
-                <h3 className="text-xs font-bold text-indigo-600 uppercase mb-4 tracking-widest">Identificação</h3>
-                <p className="text-lg font-bold text-slate-700">Orçamento #{quote.number}</p>
-                <p className="text-slate-500 mt-1">Data: {new Date(quote.date).toLocaleDateString('pt-BR')}</p>
+                <p className="text-[16px] font-bold text-[#1e293b] leading-tight mb-1">{client.name}</p>
+                <p className="text-[14px] text-[#475569]">CPF/CNPJ: {client.taxId || '---'}</p>
+                <p className="text-[14px] text-[#475569]">E-mail: {client.email}</p>
+                <p className="text-[14px] text-[#475569] max-w-sm leading-snug">{client.address}</p>
               </div>
             </div>
+            <div className="md:text-right">
+              <h3 className="text-[12px] font-bold uppercase tracking-[1px] text-[#4f46e5] mb-3">Status</h3>
+              <span className="inline-block px-4 py-1.5 rounded-full bg-[#eef2ff] text-[#4338ca] text-[13px] font-bold border border-[#e0e7ff]">
+                {quote.status}
+              </span>
+            </div>
+          </div>
 
-            {/* Tabela de Itens */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest border-b border-slate-100 pb-2">Serviços Propostos</h3>
-              <div className="divide-y divide-slate-50">
+          {/* Table Section */}
+          <div className="mb-10">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-[#f8fafc]">
+                  <th className="py-3 px-4 text-left text-[13px] font-bold text-[#475569]">Serviço</th>
+                  <th className="py-3 px-4 text-center text-[13px] font-bold text-[#475569]">Qtd</th>
+                  <th className="py-3 px-4 text-right text-[13px] font-bold text-[#475569]">Unitário</th>
+                  <th className="py-3 px-4 text-right text-[13px] font-bold text-[#475569]">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f1f5f9]">
                 {quote.items.map(item => (
-                  <div key={item.id} className="py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex-1">
-                      <p className="text-lg font-bold text-slate-800">{item.name}</p>
-                      <p className="text-sm text-slate-500 leading-relaxed mt-1">{item.description}</p>
-                    </div>
-                    <div className="flex items-center space-x-8">
-                      <div className="text-center">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Qtd</p>
-                        <p className="text-slate-700 font-medium">{item.quantity} {item.type}</p>
-                      </div>
-                      <div className="text-right min-w-[120px]">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Subtotal</p>
-                        <p className="text-lg font-bold text-slate-800">{formatCurrency(item.unitPrice * item.quantity)}</p>
-                      </div>
-                    </div>
-                  </div>
+                  <tr key={item.id} className="text-[#1e293b]">
+                    <td className="py-4 px-4 align-top">
+                      <p className="font-bold">{item.name}</p>
+                      {item.description && <p className="text-[12px] text-[#94a3b8] mt-0.5">{item.description}</p>}
+                    </td>
+                    <td className="py-4 px-4 text-center text-[14px] align-top">{item.quantity} {item.type}</td>
+                    <td className="py-4 px-4 text-right text-[14px] align-top">{formatCurrency(item.unitPrice)}</td>
+                    <td className="py-4 px-4 text-right font-bold text-[14px] align-top">{formatCurrency(item.unitPrice * item.quantity)}</td>
+                  </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals Section */}
+          <div className="flex flex-col items-end space-y-3 mb-12">
+            <div className="w-full max-w-[260px] flex justify-between text-[14px] text-[#475569]">
+              <span>Subtotal</span>
+              <span>{formatCurrency(quote.total + (quote.discount || 0))}</span>
+            </div>
+            
+            <div className="h-px bg-[#e2e8f0] w-full max-w-[260px] my-1"></div>
+            
+            <div className="w-full max-w-[260px] flex justify-between text-[20px] font-bold text-[#4f46e5]">
+              <span>Total Final</span>
+              <span>{formatCurrency(quote.total)}</span>
+            </div>
+          </div>
+
+          {/* Bottom Grid: Payment & Signature */}
+          <div className="space-y-12">
+            <div>
+              <h3 className="text-[12px] font-bold uppercase tracking-[1px] text-[#4f46e5] mb-3">Pagamento</h3>
+              <div className="bg-[#f8fafc] border border-[#e2e8f0] p-4 rounded-xl text-[14px] text-[#475569] leading-relaxed">
+                <p><strong className="text-[#1e293b]">Método:</strong> {quote.paymentMethod}</p>
+                <p>{quote.paymentConditions}</p>
               </div>
             </div>
 
-            {/* Resumo Financeiro */}
-            <div className="bg-slate-50 rounded-3xl p-8 flex flex-col md:flex-row justify-between items-center gap-8">
-              <div className="space-y-4 flex-1">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-1">Forma de Pagamento</h4>
-                  <p className="font-bold text-slate-700">{quote.paymentMethod}</p>
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-1">Condições</h4>
-                  <p className="text-sm text-slate-600">{quote.paymentConditions}</p>
-                </div>
-              </div>
-              <div className="w-full md:w-64 space-y-2">
-                <div className="flex justify-between text-sm text-slate-500">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(quote.total + quote.discount - quote.extraFees)}</span>
-                </div>
-                {quote.discount > 0 && (
-                  <div className="flex justify-between text-sm text-red-500 font-medium">
-                    <span>Desconto Aplicado</span>
-                    <span>- {formatCurrency(quote.discount)}</span>
-                  </div>
-                )}
-                <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-lg font-bold text-slate-800">Total Final</span>
-                  <span className="text-2xl font-black text-indigo-600">{formatCurrency(quote.total)}</span>
-                </div>
+            <div className="pt-10">
+              <div className="w-64 border-t border-[#e2e8f0] pt-3">
+                <p className="text-[16px] font-bold text-[#1e293b] leading-tight">{profile.name}</p>
+                <p className="text-[11px] font-bold text-[#94a3b8] uppercase tracking-[1px] mt-1">Assinatura do Fotógrafo</p>
               </div>
             </div>
-
-            {/* Observações do Fotografo */}
-            {(quote.notes || profile.defaultTerms) && (
-              <div className="border-l-4 border-indigo-100 pl-6 py-2">
-                <h3 className="text-xs font-bold text-indigo-600 uppercase mb-2 tracking-widest">Informações Importantes</h3>
-                <p className="text-sm text-slate-500 leading-relaxed whitespace-pre-line italic">
-                  {quote.notes || profile.defaultTerms}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer / Ações */}
-          <div className="bg-slate-50 p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-100">
-             <div className="flex items-center space-x-4 text-slate-400">
-                <ShieldCheck size={40} className="text-indigo-200" />
-                <div className="text-xs">
-                  <p className="font-bold text-slate-600">Ambiente Seguro</p>
-                  <p>Sua proposta está protegida digitalmente.</p>
-                </div>
-             </div>
-             <div className="flex flex-wrap justify-center gap-3">
-               {!approved ? (
-                 <>
-                   <button 
-                     onClick={() => alert('Entre em contato com o fotógrafo para solicitar alterações.')}
-                     className="px-8 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold hover:bg-slate-100 transition"
-                   >
-                     Solicitar Alteração
-                   </button>
-                   <button 
-                     onClick={handleApprove}
-                     className="px-10 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-200 transition active:scale-95 flex items-center space-x-2"
-                   >
-                     <CheckCircle size={20} />
-                     <span>Aprovar Orçamento Agora</span>
-                   </button>
-                 </>
-               ) : (
-                 <div className="text-center">
-                    <p className="text-emerald-600 font-bold mb-1">Orçamento Aprovado com Sucesso!</p>
-                    <p className="text-slate-400 text-xs italic">O fotógrafo entrará em contato em breve para os próximos passos.</p>
-                 </div>
-               )}
-             </div>
           </div>
         </div>
 
-        <div className="mt-8 text-center text-slate-400 text-sm flex items-center justify-center space-x-2">
-          <span>Powered by FocusQuote</span>
-          <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-          <span>{new Date().getFullYear()}</span>
-        </div>
+        {/* Botão de Aprovação Flutuante (Opcional) */}
+        {!approved && (
+          <button 
+            onClick={handleApprove}
+            className="w-full bg-[#10b981] hover:bg-[#059669] text-white py-5 rounded-xl font-bold text-xl shadow-xl shadow-emerald-100 transition active:scale-[0.98] flex items-center justify-center space-x-3 no-print"
+          >
+            <ShieldCheck size={28} />
+            <span>APROVAR ORÇAMENTO ONLINE</span>
+          </button>
+        )}
+
+        <footer className="text-center py-10 no-print">
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+            Gerado com FocusQuote Professional
+          </p>
+        </footer>
       </div>
     </div>
   );

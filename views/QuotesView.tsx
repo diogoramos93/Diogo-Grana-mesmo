@@ -3,10 +3,8 @@ import React, { useState } from 'react';
 import { Quote, QuoteStatus, Client, PhotographerProfile, User } from '../types';
 import { 
   Search, 
-  Filter, 
   Download, 
   Share2, 
-  MoreHorizontal, 
   Edit3, 
   Trash2,
   FileText,
@@ -15,7 +13,6 @@ import {
   AlertCircle,
   Eye,
   X,
-  Camera,
   Link as LinkIcon
 } from 'lucide-react';
 import { generateQuotePDF } from '../services/pdfService';
@@ -41,14 +38,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
   const getProfile = (): PhotographerProfile => {
     const saved = localStorage.getItem(`photo_profile_${currentUser.id}`);
     return saved ? JSON.parse(saved) : {
-      name: currentUser.name,
-      taxId: '',
-      phone: '',
-      whatsapp: '',
-      email: '',
-      address: '',
-      defaultTerms: '',
-      monthlyGoal: 5000
+      name: currentUser.name, taxId: '', phone: '', whatsapp: '', email: '', address: '', defaultTerms: '', monthlyGoal: 5000
     };
   };
 
@@ -69,12 +59,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
   const handleDownloadPDF = (quote: Quote) => {
     const client = getClientById(quote.clientId);
     const profile = getProfile();
-    
-    if (client) {
-      generateQuotePDF(quote, profile, client);
-    } else {
-      alert('Erro ao carregar dados do cliente para o PDF.');
-    }
+    if (client) generateQuotePDF(quote, profile, client);
   };
 
   const generatePublicLink = (quote: Quote) => {
@@ -84,14 +69,10 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
 
   const handleShareWhatsApp = (quote: Quote) => {
     const client = getClientById(quote.clientId);
-    if (!client || !client.phone) {
-      alert('Cliente sem telefone cadastrado.');
-      return;
-    }
-    
+    if (!client?.phone) return alert('Cliente sem telefone cadastrado.');
     const publicLink = generatePublicLink(quote);
     const message = encodeURIComponent(
-      `Olá ${client.name}! 📸\n\nSegue meu orçamento #${quote.number} no valor de ${formatCurrency(quote.total)}.\n\nVocê pode visualizar os detalhes e aprovar online através deste link:\n${publicLink}\n\nFico no aguardo!`
+      `Olá ${client.name}! 📸\n\nSegue meu orçamento #${quote.number} no valor de ${formatCurrency(quote.total)}.\n\nVisualizar e aprovar:\n${publicLink}`
     );
     window.open(`https://wa.me/${client.phone.replace(/\D/g, '')}?text=${message}`, '_blank');
   };
@@ -99,8 +80,11 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
   const copyToClipboard = (quote: Quote) => {
     const link = generatePublicLink(quote);
     navigator.clipboard.writeText(link);
-    alert('Link do orçamento copiado para a área de transferência!');
+    alert('Link do orçamento copiado!');
   };
+
+  const formatCurrency = (val: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   const getStatusIcon = (status: QuoteStatus) => {
     switch (status) {
@@ -120,9 +104,6 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
     }
   };
 
-  const formatCurrency = (val: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -132,27 +113,21 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
             <input 
               type="text" 
               placeholder="Número ou cliente..." 
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <select 
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="all">Todos Status</option>
-            <option value={QuoteStatus.DRAFT}>Rascunho</option>
-            <option value={QuoteStatus.SENT}>Enviado</option>
-            <option value={QuoteStatus.APPROVED}>Aprovado</option>
-            <option value={QuoteStatus.DECLINED}>Recusado</option>
+            {Object.values(QuoteStatus).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
-        <button 
-          onClick={onNewQuote}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold shadow-md transition whitespace-nowrap"
-        >
+        <button onClick={onNewQuote} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold shadow-md transition">
           Novo Orçamento
         </button>
       </div>
@@ -161,137 +136,152 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Número</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Data</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Ações</th>
+              <tr className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <th className="px-6 py-4">Número</th>
+                <th className="px-6 py-4">Cliente</th>
+                <th className="px-6 py-4">Data</th>
+                <th className="px-6 py-4">Total</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredQuotes.map(quote => (
                 <tr key={quote.id} className="hover:bg-slate-50 transition">
                   <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-700">#{quote.number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-slate-600">{getClientById(quote.clientId)?.name || 'Desconhecido'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-slate-600">{getClientById(quote.clientId)?.name || '---'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-slate-500">{new Date(quote.date).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-6 py-4 whitespace-nowrap font-bold text-indigo-600">
-                    {formatCurrency(quote.total)}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap font-bold text-indigo-600">{formatCurrency(quote.total)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusClass(quote.status)}`}>
                       {getStatusIcon(quote.status)}
                       <span>{quote.status}</span>
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button 
-                        onClick={() => setPreviewQuote(quote)}
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-                        title="Pré-visualizar"
-                      >
-                        <Eye size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleShareWhatsApp(quote)}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
-                        title="Compartilhar WhatsApp"
-                      >
-                        <Share2 size={18} />
-                      </button>
-                      <button 
-                        onClick={() => copyToClipboard(quote)}
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
-                        title="Copiar Link"
-                      >
-                        <LinkIcon size={18} />
-                      </button>
-                      <button 
-                        onClick={() => onEditQuote(quote.id)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Editar"
-                      >
-                        <Edit3 size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(quote.id)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Excluir"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap text-right space-x-1">
+                    <button onClick={() => setPreviewQuote(quote)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Ver Orçamento"><Eye size={18} /></button>
+                    <button onClick={() => handleShareWhatsApp(quote)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="WhatsApp"><Share2 size={18} /></button>
+                    <button onClick={() => copyToClipboard(quote)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition" title="Link"><LinkIcon size={18} /></button>
+                    <button onClick={() => onEditQuote(quote.id)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar"><Edit3 size={18} /></button>
+                    <button onClick={() => handleDelete(quote.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Excluir"><Trash2 size={18} /></button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {filteredQuotes.length === 0 && (
-            <div className="py-20 text-center text-slate-400">
-              Nenhum orçamento encontrado.
-            </div>
-          )}
         </div>
       </div>
 
-      {/* MODAL DE PREVIEW (Já existente, sem alterações solicitadas) */}
+      {/* MODAL DE PREVIEW - CÓPIA DO LINK PÚBLICO */}
       {previewQuote && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 md:p-8">
-          <div className="bg-slate-100 rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            {/* ... Conteúdo do Modal de Preview (Mesmo já implementado) ... */}
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="bg-slate-100 rounded-3xl w-full max-w-5xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            
             <div className="bg-white p-4 border-b border-slate-200 flex justify-between items-center shrink-0">
-              <div className="flex items-center space-x-3">
-                <div className="bg-indigo-600 p-2 rounded-lg text-white">
-                  <Eye size={20} />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800">Pré-visualização do Orçamento #{previewQuote.number}</h3>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => handleDownloadPDF(previewQuote)}
-                  className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold transition"
-                >
-                  <Download size={16} />
-                  <span>Baixar PDF</span>
-                </button>
-                <button 
-                  onClick={() => setPreviewQuote(null)}
-                  className="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-50 transition"
-                >
-                  <X size={24} />
-                </button>
-              </div>
+               <div className="flex items-center space-x-3">
+                  <div className="bg-indigo-600 p-2 rounded-lg text-white"><Eye size={20} /></div>
+                  <h3 className="font-bold text-slate-800">Visualização do Orçamento</h3>
+               </div>
+               <div className="flex items-center space-x-2">
+                  <button onClick={() => handleDownloadPDF(previewQuote)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2">
+                    <Download size={16} /> <span>Baixar PDF</span>
+                  </button>
+                  <button onClick={() => setPreviewQuote(null)} className="text-slate-400 hover:bg-slate-50 p-2 rounded-lg"><X size={24} /></button>
+               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 md:p-12 text-center">
-               {/* Simplicado para o XML, o conteúdo interno do preview é o mesmo */}
-               <p className="text-slate-500 italic">Visualizando orçamento #{previewQuote.number} para {getClientById(previewQuote.clientId)?.name}</p>
-               <div className="mt-8 bg-white p-8 rounded-xl shadow-inner max-w-2xl mx-auto border border-slate-200 text-left">
-                  <h4 className="text-2xl font-bold text-indigo-600 mb-4">{getProfile().studioName || getProfile().name}</h4>
-                  <div className="h-px bg-slate-100 mb-6"></div>
-                  <div className="flex justify-between mb-8">
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Cliente</p>
-                      <p className="font-bold">{getClientById(previewQuote.clientId)?.name}</p>
+
+            <div className="flex-1 overflow-y-auto p-4 md:p-12 bg-slate-200/50">
+               {/* Folha A4 Digital no Modal */}
+               <div className="bg-white mx-auto w-full max-w-[210mm] shadow-xl p-12 md:p-20 min-h-[297mm] rounded-sm">
+                  
+                  {/* Header */}
+                  <div className="flex justify-between items-start mb-12">
+                    <div className="space-y-1">
+                      <h1 className="text-3xl font-black text-indigo-600 tracking-tight leading-none mb-4">{getProfile().studioName || getProfile().name}</h1>
+                      <div className="text-slate-500 text-[13px] leading-relaxed">
+                        <p>{getProfile().name}</p>
+                        <p>CNPJ/CPF: {getProfile().taxId}</p>
+                        <p>{getProfile().phone}</p>
+                        <p>{getProfile().address}</p>
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase">Total</p>
-                      <p className="font-bold text-2xl text-indigo-600">{formatCurrency(previewQuote.total)}</p>
+                      <h2 className="text-2xl font-bold text-slate-800 tracking-tight">ORÇAMENTO</h2>
+                      <p className="font-black text-slate-600">#{previewQuote.number}</p>
+                      <div className="text-[11px] text-slate-400 font-bold uppercase mt-6 space-y-1">
+                        <p>Emissão: {new Date(previewQuote.date).toLocaleDateString('pt-BR')}</p>
+                        <p>Vencimento: {new Date(previewQuote.validUntil).toLocaleDateString('pt-BR')}</p>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-500 mb-4">Itens do Orçamento:</p>
-                  <ul className="space-y-2 mb-8">
-                    {previewQuote.items.map(item => (
-                      <li key={item.id} className="flex justify-between text-sm py-2 border-b border-slate-50">
-                        <span>{item.name} (x{item.quantity})</span>
-                        <span className="font-bold">{formatCurrency(item.unitPrice * item.quantity)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="bg-slate-50 p-4 rounded-xl">
-                    <p className="text-xs font-bold text-slate-400 uppercase">Pagamento</p>
-                    <p className="text-sm">{previewQuote.paymentMethod} - {previewQuote.paymentConditions}</p>
+
+                  <div className="h-px bg-slate-100 w-full mb-10"></div>
+
+                  {/* Grid Cliente/Status */}
+                  <div className="flex justify-between mb-12">
+                    <div className="space-y-4">
+                      <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Cliente</h3>
+                      <div className="space-y-0.5">
+                        <p className="text-xl font-bold text-slate-800">{getClientById(previewQuote.clientId)?.name}</p>
+                        <p className="text-[13px] text-slate-500">CPF/CNPJ: {getClientById(previewQuote.clientId)?.taxId || '---'}</p>
+                        <p className="text-[13px] text-slate-500">{getClientById(previewQuote.clientId)?.address}</p>
+                      </div>
+                    </div>
+                    <div className="text-right space-y-4">
+                      <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Status</h3>
+                      <span className="inline-block bg-indigo-50 text-indigo-600 px-4 py-1 rounded-full text-[11px] font-bold border border-indigo-100 uppercase tracking-wide">{previewQuote.status}</span>
+                    </div>
+                  </div>
+
+                  {/* Tabela */}
+                  <table className="w-full mb-10 text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Serviço</th>
+                        <th className="py-4 px-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">Qtd</th>
+                        <th className="py-4 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {previewQuote.items.map(item => (
+                        <tr key={item.id} className="text-sm">
+                          <td className="py-5 px-4">
+                            <p className="font-bold text-slate-800">{item.name}</p>
+                            {item.description && <p className="text-xs text-slate-400 mt-1">{item.description}</p>}
+                          </td>
+                          <td className="py-5 px-4 text-center">{item.quantity} {item.type}</td>
+                          <td className="py-5 px-4 text-right font-black text-slate-900">{formatCurrency(item.unitPrice * item.quantity)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Totais */}
+                  <div className="flex flex-col items-end pt-6 border-t border-slate-50 mb-16">
+                     <div className="flex justify-between w-64 text-sm text-slate-400 mb-2">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(previewQuote.total + (previewQuote.discount || 0))}</span>
+                     </div>
+                     <div className="flex justify-between items-center w-72 pt-4">
+                        <span className="text-xl font-bold text-indigo-600">Total Final</span>
+                        <span className="text-2xl font-black text-indigo-600 tracking-tight">{formatCurrency(previewQuote.total)}</span>
+                     </div>
+                  </div>
+
+                  {/* Pagamento */}
+                  <div className="space-y-4 mb-12">
+                    <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Pagamento</h3>
+                    <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl text-[13px] text-slate-600">
+                      <p><strong className="text-slate-800">Método:</strong> {previewQuote.paymentMethod}</p>
+                      <p className="mt-1">{previewQuote.paymentConditions}</p>
+                    </div>
+                  </div>
+
+                  {/* Assinatura */}
+                  <div className="mt-auto pt-10">
+                    <div className="w-64 border-b border-slate-200 mb-2"></div>
+                    <p className="text-sm font-bold text-slate-800">{getProfile().name}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assinatura do Fotógrafo</p>
                   </div>
                </div>
             </div>

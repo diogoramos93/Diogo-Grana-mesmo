@@ -3,6 +3,37 @@ import React from 'react';
 import { PhotographerProfile } from '../types';
 import { Save, Camera, Mail, Phone, MapPin, Globe, Instagram, CreditCard, Target } from 'lucide-react';
 
+interface InputFieldProps {
+  label: string;
+  icon: any;
+  value: string | number;
+  field: keyof PhotographerProfile;
+  placeholder?: string;
+  type?: string;
+  onChange: (field: keyof PhotographerProfile, value: any) => void;
+}
+
+const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, field, placeholder, type = 'text', onChange }) => (
+  <div className="space-y-1">
+    <label className="text-xs font-bold text-slate-500 uppercase">{label}</label>
+    <div className="relative">
+      <div className="absolute left-3 top-3 text-slate-400">
+        <Icon size={18} />
+      </div>
+      <input 
+        type={type}
+        placeholder={placeholder}
+        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
+        value={value || ''}
+        onChange={e => {
+          const val = type === 'number' ? Number(e.target.value) : e.target.value;
+          onChange(field, val);
+        }}
+      />
+    </div>
+  </div>
+);
+
 interface ProfileViewProps {
   profile: PhotographerProfile;
   setProfile: React.Dispatch<React.SetStateAction<PhotographerProfile>>;
@@ -14,26 +45,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
     alert('Perfil salvo com sucesso!');
   };
 
-  const InputField = ({ label, icon: Icon, value, field, placeholder, type = 'text' }: any) => (
-    <div className="space-y-1">
-      <label className="text-xs font-bold text-slate-500 uppercase">{label}</label>
-      <div className="relative">
-        <div className="absolute left-3 top-3 text-slate-400">
-          <Icon size={18} />
-        </div>
-        <input 
-          type={type}
-          placeholder={placeholder}
-          className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
-          value={value}
-          onChange={e => {
-            const val = type === 'number' ? Number(e.target.value) : e.target.value;
-            setProfile({ ...profile, [field]: val });
-          }}
-        />
-      </div>
-    </div>
-  );
+  const updateProfile = (field: keyof PhotographerProfile, value: any) => {
+    setProfile(prev => ({ ...prev, [field]: value }));
+  };
 
   return (
     <div className="max-w-4xl mx-auto pb-12">
@@ -64,7 +78,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
                   type="number" 
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition font-bold text-indigo-600"
                   value={profile.monthlyGoal}
-                  onChange={e => setProfile({ ...profile, monthlyGoal: Number(e.target.value) })}
+                  onChange={e => updateProfile('monthlyGoal', Number(e.target.value))}
                 />
                 <p className="text-[10px] text-slate-400 mt-1 italic">Este valor será usado para calcular seu progresso no Dashboard.</p>
               </div>
@@ -73,8 +87,22 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
             <div className="bg-indigo-900 p-6 rounded-3xl text-white shadow-lg">
               <h4 className="font-bold mb-4 flex items-center"><Globe size={18} className="mr-2" /> Presença Online</h4>
               <div className="space-y-4">
-                <InputField icon={Globe} value={profile.website} field="website" placeholder="Seu site oficial" />
-                <InputField icon={Instagram} value={profile.instagram} field="instagram" placeholder="@seufotografo" />
+                <InputField 
+                  label="Website" 
+                  icon={Globe} 
+                  value={profile.website || ''} 
+                  field="website" 
+                  placeholder="Seu site oficial" 
+                  onChange={updateProfile} 
+                />
+                <InputField 
+                  label="Instagram" 
+                  icon={Instagram} 
+                  value={profile.instagram || ''} 
+                  field="instagram" 
+                  placeholder="@seufotografo" 
+                  onChange={updateProfile} 
+                />
               </div>
             </div>
           </div>
@@ -85,21 +113,21 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
               <h3 className="text-xl font-bold text-slate-800 pb-4 border-b border-slate-50">Dados Profissionais</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="Nome Completo" icon={Camera} value={profile.name} field="name" />
-                <InputField label="Nome do Estúdio" icon={Camera} value={profile.studioName} field="studioName" />
+                <InputField label="Nome Completo" icon={Camera} value={profile.name} field="name" onChange={updateProfile} />
+                <InputField label="Nome do Estúdio" icon={Camera} value={profile.studioName || ''} field="studioName" onChange={updateProfile} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="CPF / CNPJ" icon={CreditCard} value={profile.taxId} field="taxId" />
-                <InputField label="Telefone" icon={Phone} value={profile.phone} field="phone" />
+                <InputField label="CPF / CNPJ" icon={CreditCard} value={profile.taxId} field="taxId" onChange={updateProfile} />
+                <InputField label="Telefone" icon={Phone} value={profile.phone} field="phone" onChange={updateProfile} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="WhatsApp" icon={Phone} value={profile.whatsapp} field="whatsapp" />
-                <InputField label="E-mail" icon={Mail} value={profile.email} field="email" type="email" />
+                <InputField label="WhatsApp" icon={Phone} value={profile.whatsapp} field="whatsapp" onChange={updateProfile} />
+                <InputField label="E-mail" icon={Mail} value={profile.email} field="email" type="email" onChange={updateProfile} />
               </div>
 
-              <InputField label="Endereço Comercial" icon={MapPin} value={profile.address} field="address" />
+              <InputField label="Endereço Comercial" icon={MapPin} value={profile.address} field="address" onChange={updateProfile} />
 
               <div className="space-y-1 pt-4">
                 <label className="text-xs font-bold text-slate-500 uppercase">Termos Padrão do Orçamento</label>
@@ -107,7 +135,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
                   rows={4}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
                   value={profile.defaultTerms}
-                  onChange={e => setProfile({ ...profile, defaultTerms: e.target.value })}
+                  onChange={e => updateProfile('defaultTerms', e.target.value)}
                   placeholder="Ex: Política de cancelamento, prazos de entrega..."
                 />
               </div>

@@ -2,6 +2,7 @@
 export enum QuoteStatus {
   DRAFT = 'Rascunho',
   SENT = 'Enviado',
+  VIEWED = 'Visualizado',
   APPROVED = 'Aprovado',
   DECLINED = 'Recusado'
 }
@@ -31,6 +32,14 @@ export interface User {
   createdAt: string;
 }
 
+export interface ServiceTemplate {
+  id: string;
+  name: string;
+  description: string;
+  defaultPrice: number;
+  type: ServiceType;
+}
+
 export interface PhotographerProfile {
   name: string;
   studioName?: string;
@@ -43,7 +52,7 @@ export interface PhotographerProfile {
   website?: string;
   instagram?: string;
   defaultTerms: string;
-  monthlyGoal: number; // Nova propriedade
+  monthlyGoal: number;
 }
 
 export interface Client {
@@ -80,4 +89,5 @@ export interface Quote {
   paymentConditions: string;
   notes?: string;
   total: number;
+  coverImageUrl?: string; // Nova propriedade
 }
