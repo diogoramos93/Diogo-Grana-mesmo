@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PhotographerProfile } from '../types';
 import { Save, Camera, Mail, Phone, MapPin, CreditCard, Target, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -8,13 +8,12 @@ interface InputFieldProps {
   label: string;
   icon: any;
   value: string | number;
-  field: keyof PhotographerProfile;
   placeholder?: string;
   type?: string;
-  onChange: (field: keyof PhotographerProfile, value: any) => void;
+  onChange: (value: any) => void;
 }
 
-const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, field, placeholder, type = 'text', onChange }) => (
+const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, placeholder, type = 'text', onChange }) => (
   <div className="space-y-1">
     <label className="text-xs font-bold text-slate-500 uppercase ml-1">{label}</label>
     <div className="relative">
@@ -28,7 +27,7 @@ const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, field
         value={value || ''}
         onChange={e => {
           const val = type === 'number' ? Number(e.target.value) : e.target.value;
-          onChange(field, val);
+          onChange(val);
         }}
       />
     </div>
@@ -46,6 +45,13 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, 
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // Estado local para evitar que cada tecla digitada cause re-render no App.tsx (perda de foco)
+  const [localProfile, setLocalProfile] = useState<PhotographerProfile>({...profile});
+
+  useEffect(() => {
+    setLocalProfile({...profile});
+  }, [profile]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,17 +65,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, 
         .from('profiles')
         .upsert({
           user_id: userId,
-          name: profile.name,
-          studio_name: profile.studioName,
-          tax_id: profile.taxId,
-          phone: profile.phone,
-          whatsapp: profile.whatsapp,
-          email: profile.email,
-          address: profile.address,
-          website: profile.website,
-          instagram: profile.instagram,
-          default_terms: profile.defaultTerms,
-          monthly_goal: profile.monthlyGoal
+          name: localProfile.name,
+          studio_name: localProfile.studioName,
+          tax_id: localProfile.taxId,
+          phone: localProfile.phone,
+          whatsapp: localProfile.whatsapp,
+          email: localProfile.email,
+          address: localProfile.address,
+          website: localProfile.website,
+          instagram: localProfile.instagram,
+          default_terms: localProfile.defaultTerms,
+          monthly_goal: localProfile.monthlyGoal
         });
       
       if (error) throw error;
@@ -79,14 +85,14 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, 
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
       console.error("Erro ao salvar:", err);
-      setErrorMsg(err.message || 'Erro de conexão com o Supabase.');
+      setErrorMsg(err.message || 'Erro de conexão com o banco.');
     } finally {
       setSaving(false);
     }
   };
 
-  const updateProfile = (field: keyof PhotographerProfile, value: any) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
+  const updateLocal = (field: keyof PhotographerProfile, value: any) => {
+    setLocalProfile(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -105,7 +111,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, 
                   <Camera size={48} />
                 </div>
               </div>
-              <h3 className="font-black text-slate-800 text-xl leading-tight">{profile.studioName || profile.name || 'Seu Estúdio'}</h3>
+              <h3 className="font-black text-slate-800 text-xl leading-tight">{localProfile.studioName || localProfile.name || 'Seu Estúdio'}</h3>
               <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mt-1">Status: Ativo</p>
             </div>
 
@@ -120,8 +126,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, 
                   <input 
                     type="number" 
                     className="w-full pl-12 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-black text-indigo-400 text-xl"
-                    value={profile.monthlyGoal}
-                    onChange={e => updateProfile('monthlyGoal', Number(e.target.value))}
+                    value={localProfile.monthlyGoal}
+                    onChange={e => updateLocal('monthlyGoal', Number(e.target.value))}
                   />
                 </div>
               </div>
@@ -147,29 +153,29 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, 
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputField label="Seu Nome" icon={Camera} value={profile.name} field="name" onChange={updateProfile} />
-                <InputField label="Nome do Estúdio" icon={Camera} value={profile.studioName || ''} field="studioName" onChange={updateProfile} />
+                <InputField label="Seu Nome" icon={Camera} value={localProfile.name} onChange={v => updateLocal('name', v)} />
+                <InputField label="Nome do Estúdio" icon={Camera} value={localProfile.studioName || ''} onChange={v => updateLocal('studioName', v)} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputField label="CPF ou CNPJ" icon={CreditCard} value={profile.taxId} field="taxId" onChange={updateProfile} />
-                <InputField label="WhatsApp" icon={Phone} value={profile.whatsapp} field="whatsapp" onChange={updateProfile} />
+                <InputField label="CPF ou CNPJ" icon={CreditCard} value={localProfile.taxId} onChange={v => updateLocal('taxId', v)} />
+                <InputField label="WhatsApp" icon={Phone} value={localProfile.whatsapp} onChange={v => updateLocal('whatsapp', v)} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputField label="E-mail" icon={Mail} value={profile.email} field="email" type="email" onChange={updateProfile} />
-                <InputField label="Telefone Fixo" icon={Phone} value={profile.phone || ''} field="phone" onChange={updateProfile} />
+                <InputField label="E-mail" icon={Mail} value={localProfile.email} type="email" onChange={v => updateLocal('email', v)} />
+                <InputField label="Telefone Fixo" icon={Phone} value={localProfile.phone || ''} onChange={v => updateLocal('phone', v)} />
               </div>
 
-              <InputField label="Endereço Profissional" icon={MapPin} value={profile.address} field="address" onChange={updateProfile} />
+              <InputField label="Endereço Profissional" icon={MapPin} value={localProfile.address} onChange={v => updateLocal('address', v)} />
 
               <div className="space-y-2 pt-4 border-t border-slate-50">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Termos e Condições Padrão</label>
                 <textarea 
                   rows={4}
                   className="w-full px-6 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-slate-600"
-                  value={profile.defaultTerms}
-                  onChange={e => updateProfile('defaultTerms', e.target.value)}
+                  value={localProfile.defaultTerms}
+                  onChange={e => updateLocal('defaultTerms', e.target.value)}
                   placeholder="Ex: Reserva 30%..."
                 />
               </div>

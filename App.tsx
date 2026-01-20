@@ -44,8 +44,8 @@ const App: React.FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [services, setServices] = useState<ServiceTemplate[]>([]);
 
-  // Ref para evitar loops e garantir trava de sincronismo
   const isSyncingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   const urlParams = new URLSearchParams(window.location.search);
   const isPublicView = urlParams.get('view') === 'public';
@@ -58,10 +58,10 @@ const App: React.FC = () => {
     setSyncing(true);
     
     try {
-      // 1. Carrega Perfil
       const { data: pData } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
       
       let currentRole: any = 'photographer';
+      let isFirstTime = false;
 
       if (pData) {
         currentRole = pData.role || 'photographer';
@@ -77,18 +77,30 @@ const App: React.FC = () => {
           monthlyGoal: Number(pData.monthly_goal) || 5000
         });
       } else {
+        isFirstTime = true;
         await supabase.from('profiles').insert({ user_id: userId, email: email || '', name: email?.split('@')[0] || 'Usuário' });
       }
 
-      // Atualiza o usuário no estado se o papel mudou ou se é a primeira carga
+      // Estabiliza o usuário para evitar re-renderizações desnecessárias que causam "piscadas"
       setCurrentUser(prev => {
-        if (!prev || prev.role !== currentRole) {
-          return prev ? { ...prev, role: currentRole } : null;
+        if (!prev || prev.role !== currentRole || prev.id !== userId) {
+          return {
+            id: userId,
+            username: email || '',
+            name: email?.split('@')[0] || 'Usuário',
+            role: currentRole,
+            isBlocked: false,
+            createdAt: new Date().toISOString()
+          };
         }
         return prev;
       });
 
-      // 2. Clientes
+      // Direcionamento inteligente: Se for o primeiro acesso, manda para o perfil
+      if (isFirstTime && !hasInitializedRef.current) {
+        setActiveTab('profile');
+      }
+
       const { data: cData } = await supabase.from('clients').select('*').eq('user_id', userId).order('name');
       if (cData) {
         setClients(cData.map(c => ({ 
@@ -97,7 +109,6 @@ const App: React.FC = () => {
         })));
       }
 
-      // 3. Serviços
       const { data: sData } = await supabase.from('services').select('*').eq('user_id', userId).order('name');
       if (sData) {
         setServices(sData.map(s => ({ 
@@ -106,7 +117,6 @@ const App: React.FC = () => {
         })));
       }
 
-      // 4. Orçamentos
       const { data: qData } = await supabase.from('quotes').select('*, items:quote_items(*)').eq('user_id', userId).order('created_at', { ascending: false });
       if (qData) {
         setQuotes(qData.map(q => ({
@@ -118,6 +128,8 @@ const App: React.FC = () => {
           }))
         })));
       }
+      
+      hasInitializedRef.current = true;
     } catch (err: any) {
       console.error("Erro no sincronismo:", err);
       setError(err.message);
@@ -126,21 +138,12 @@ const App: React.FC = () => {
       isSyncingRef.current = false;
       setLoading(false);
     }
-  }, []); // Dependências vazias para estabilidade total
+  }, []);
 
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const user: User = {
-          id: session.user.id,
-          username: session.user.email || '',
-          name: session.user.user_metadata.name || session.user.email?.split('@')[0],
-          role: 'photographer',
-          isBlocked: false,
-          createdAt: session.user.created_at
-        };
-        setCurrentUser(user);
         await loadData(session.user.id, session.user.email);
       } else {
         setLoading(false);
@@ -149,19 +152,11 @@ const App: React.FC = () => {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        const user: User = {
-          id: session.user.id,
-          username: session.user.email || '',
-          name: session.user.user_metadata.name || session.user.email?.split('@')[0],
-          role: 'photographer',
-          isBlocked: false,
-          createdAt: session.user.created_at
-        };
-        setCurrentUser(user);
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
         await loadData(session.user.id, session.user.email);
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
+        hasInitializedRef.current = false;
         setLoading(false);
       }
     });
