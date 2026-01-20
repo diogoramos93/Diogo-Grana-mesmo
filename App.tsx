@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -13,7 +13,7 @@ import {
   Briefcase,
   Loader2,
   RefreshCw,
-  AlertTriangle
+  BarChart3
 } from 'lucide-react';
 import { PhotographerProfile, Client, Quote, QuoteStatus, User, ServiceTemplate, ServiceType, PaymentMethod } from './types';
 import Dashboard from './views/Dashboard';
@@ -25,6 +25,7 @@ import AdminView from './views/AdminView';
 import LoginView from './views/LoginView';
 import PublicQuoteView from './views/PublicQuoteView';
 import ServicesView from './views/ServicesView';
+import ReportsView from './views/ReportsView';
 import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
@@ -43,19 +44,27 @@ const App: React.FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [services, setServices] = useState<ServiceTemplate[]>([]);
 
+  // Ref para evitar loops e garantir trava de sincronismo
+  const isSyncingRef = useRef(false);
+
   const urlParams = new URLSearchParams(window.location.search);
   const isPublicView = urlParams.get('view') === 'public';
   const publicQuoteId = urlParams.get('q');
   const publicUserId = urlParams.get('u');
 
   const loadData = useCallback(async (userId: string, email?: string) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
     setSyncing(true);
-    console.log("Sincronizando dados para o usuário:", userId);
-
+    
     try {
-      // 1. Perfil
+      // 1. Carrega Perfil
       const { data: pData } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+      
+      let currentRole: any = 'photographer';
+
       if (pData) {
+        currentRole = pData.role || 'photographer';
         setProfile({
           name: pData.name || '',
           studioName: pData.studio_name || '',
@@ -67,35 +76,33 @@ const App: React.FC = () => {
           defaultTerms: pData.default_terms || '',
           monthlyGoal: Number(pData.monthly_goal) || 5000
         });
-        if (pData.role) setCurrentUser(prev => prev ? { ...prev, role: pData.role as any } : null);
       } else {
         await supabase.from('profiles').insert({ user_id: userId, email: email || '', name: email?.split('@')[0] || 'Usuário' });
       }
 
-      // 2. Clientes (Mapeamento explícito de tax_id)
+      // Atualiza o usuário no estado se o papel mudou ou se é a primeira carga
+      setCurrentUser(prev => {
+        if (!prev || prev.role !== currentRole) {
+          return prev ? { ...prev, role: currentRole } : null;
+        }
+        return prev;
+      });
+
+      // 2. Clientes
       const { data: cData } = await supabase.from('clients').select('*').eq('user_id', userId).order('name');
       if (cData) {
         setClients(cData.map(c => ({ 
-          id: c.id, 
-          name: c.name, 
-          email: c.email || '', 
-          phone: c.phone || '', 
-          taxId: c.tax_id || '', 
-          address: c.address || '', 
-          type: (c.type as 'PF'|'PJ') || 'PF',
-          notes: c.notes || ''
+          id: c.id, name: c.name, email: c.email || '', phone: c.phone || '', taxId: c.tax_id || '', 
+          address: c.address || '', type: (c.type as 'PF'|'PJ') || 'PF', notes: c.notes || ''
         })));
       }
 
-      // 3. Serviços (Mapeamento explícito de default_price)
+      // 3. Serviços
       const { data: sData } = await supabase.from('services').select('*').eq('user_id', userId).order('name');
       if (sData) {
         setServices(sData.map(s => ({ 
-          id: s.id, 
-          name: s.name, 
-          description: s.description || '', 
-          defaultPrice: Number(s.default_price) || 0, 
-          type: (s.type as ServiceType) || ServiceType.PACKAGE
+          id: s.id, name: s.name, description: s.description || '', 
+          defaultPrice: Number(s.default_price) || 0, type: (s.type as ServiceType) || ServiceType.PACKAGE
         })));
       }
 
@@ -103,30 +110,23 @@ const App: React.FC = () => {
       const { data: qData } = await supabase.from('quotes').select('*, items:quote_items(*)').eq('user_id', userId).order('created_at', { ascending: false });
       if (qData) {
         setQuotes(qData.map(q => ({
-          id: q.id,
-          number: q.number,
-          clientId: q.client_id,
-          date: q.date,
-          validUntil: q.valid_until,
-          status: q.status as QuoteStatus,
-          discount: Number(q.discount) || 0,
-          extraFees: Number(q.extra_fees) || 0,
-          paymentMethod: q.payment_method as PaymentMethod,
-          paymentConditions: q.payment_conditions || '',
-          total: Number(q.total) || 0,
+          id: q.id, number: q.number, clientId: q.client_id, date: q.date, validUntil: q.valid_until,
+          status: q.status as QuoteStatus, discount: Number(q.discount) || 0, extraFees: Number(q.extra_fees) || 0,
+          paymentMethod: q.payment_method as PaymentMethod, paymentConditions: q.payment_conditions || '', total: Number(q.total) || 0,
           items: (q.items || []).map((i: any) => ({
             id: i.id, name: i.name, description: i.description || '', unitPrice: Number(i.unit_price) || 0, quantity: Number(i.quantity) || 1, type: i.type as ServiceType
           }))
         })));
       }
     } catch (err: any) {
-      console.error("Erro ao carregar dados:", err);
+      console.error("Erro no sincronismo:", err);
       setError(err.message);
     } finally {
       setSyncing(false);
+      isSyncingRef.current = false;
       setLoading(false);
     }
-  }, []);
+  }, []); // Dependências vazias para estabilidade total
 
   useEffect(() => {
     const init = async () => {
@@ -186,6 +186,7 @@ const App: React.FC = () => {
       case 'clients': return <ClientsView clients={clients} onRefresh={() => loadData(currentUser.id, currentUser.username)} userId={currentUser.id} />;
       case 'services': return <ServicesView services={services} onRefresh={() => loadData(currentUser.id, currentUser.username)} userId={currentUser.id} />;
       case 'quotes': return <QuotesView quotes={quotes} setQuotes={setQuotes} clients={clients} currentUser={currentUser} onEditQuote={(id) => { setEditingQuoteId(id); setActiveTab('quote-builder'); }} onNewQuote={() => { setEditingQuoteId(null); setActiveTab('quote-builder'); }} profile={profile} />;
+      case 'reports': return <ReportsView quotes={quotes} clients={clients} />;
       case 'profile': return <ProfileView profile={profile} setProfile={setProfile} userId={currentUser.id} onRefresh={() => loadData(currentUser.id, currentUser.username)} />;
       case 'quote-builder': return <QuoteBuilder profile={profile} clients={clients} services={services} setQuotes={setQuotes} initialQuoteId={editingQuoteId} userId={currentUser.id} onCancel={() => setActiveTab('quotes')} onSave={async () => { await loadData(currentUser.id, currentUser.username); setActiveTab('quotes'); }} />;
       case 'admin': return <AdminView />;
@@ -207,6 +208,7 @@ const App: React.FC = () => {
               { id: 'quotes', icon: FileText, label: 'Orçamentos' },
               { id: 'clients', icon: Users, label: 'Clientes' },
               { id: 'services', icon: Briefcase, label: 'Catálogo' },
+              { id: 'reports', icon: BarChart3, label: 'Relatórios' },
               { id: 'profile', icon: UserCircle, label: 'Meu Perfil' }
             ].map(item => (
               <button key={item.id} onClick={() => {setActiveTab(item.id); setIsSidebarOpen(false)}} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-600 hover:bg-slate-50'}`}>

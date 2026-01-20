@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Client } from '../types';
-import { Search, UserPlus, Edit2, Trash2, Mail, Phone, MapPin, X, Loader2, AlertCircle, Users, CreditCard, FileText } from 'lucide-react';
+import { Search, UserPlus, Edit2, Trash2, Mail, Phone, MapPin, X, Loader2, AlertCircle, Users, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface ClientsViewProps {
@@ -29,36 +29,44 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, onRefresh, userId })
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || saving) return;
+    
     setSaving(true);
     setErrorMsg('');
     
     try {
-      // Mapeando explicitamente para os nomes de coluna do banco (snake_case)
+      // Garantindo que valores vazios sejam tratados como string vazia ou null para o Postgres
       const dataToSave = {
         user_id: userId,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        tax_id: formData.taxId,
-        address: formData.address,
-        type: formData.type,
-        notes: formData.notes
+        name: formData.name.trim(),
+        email: formData.email?.trim() || null,
+        phone: formData.phone?.trim() || null,
+        tax_id: formData.taxId?.trim() || null,
+        address: formData.address?.trim() || null,
+        type: formData.type || 'PF',
+        notes: formData.notes?.trim() || null
       };
 
+      let result;
       if (editingClient) {
-        const { error } = await supabase.from('clients').update(dataToSave).eq('id', editingClient.id);
-        if (error) throw error;
+        result = await supabase.from('clients').update(dataToSave).eq('id', editingClient.id);
       } else {
-        const { error } = await supabase.from('clients').insert([dataToSave]);
-        if (error) throw error;
+        result = await supabase.from('clients').insert([dataToSave]);
+      }
+
+      if (result.error) throw result.error;
+      
+      // Tenta atualizar a lista. Se falhar, avisa, mas fecha o modal.
+      try {
+        await onRefresh();
+      } catch (refreshErr) {
+        console.warn("Cliente salvo, mas erro ao atualizar lista:", refreshErr);
       }
       
-      await onRefresh();
       setIsModalOpen(false);
       resetForm();
     } catch (err: any) {
-      console.error("Erro ao salvar cliente:", err);
-      setErrorMsg(err.message || 'Erro ao salvar cliente no banco.');
+      console.error("Erro crítico ao salvar cliente:", err);
+      setErrorMsg(err.message || 'Erro de comunicação com o banco de dados.');
     } finally {
       setSaving(false);
     }
@@ -116,7 +124,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, onRefresh, userId })
             <div className="flex justify-between items-start mb-6">
               <div className="flex items-center space-x-4">
                 <div className="h-14 w-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center text-indigo-600 border border-indigo-100 font-black text-xl uppercase">
-                  {client.name.charAt(0)}
+                  {(client.name || 'C').charAt(0)}
                 </div>
                 <div>
                   <h3 className="font-black text-slate-800 leading-none text-lg">{client.name}</h3>
@@ -132,12 +140,12 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, onRefresh, userId })
             </div>
 
             <div className="space-y-4 text-sm text-slate-500">
-              <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <Mail size={18} className="text-slate-400" />
+              <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100 overflow-hidden">
+                <Mail size={18} className="text-slate-400 shrink-0" />
                 <span className="truncate font-bold">{client.email || 'E-mail não informado'}</span>
               </div>
               <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <Phone size={18} className="text-slate-400" />
+                <Phone size={18} className="text-slate-400 shrink-0" />
                 <span className="font-bold">{client.phone || 'Sem telefone'}</span>
               </div>
               {client.address && (
@@ -193,11 +201,11 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, onRefresh, userId })
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
-                  <input type="email" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                  <input type="email" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp</label>
-                  <input type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                  <input type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                 </div>
               </div>
 
@@ -206,21 +214,21 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, onRefresh, userId })
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">CPF ou CNPJ</label>
                   <div className="relative">
                     <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input type="text" className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
+                    <input type="text" className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.taxId || ''} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Endereço Completo</label>
                   <div className="relative">
                     <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input type="text" className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                    <input type="text" className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.address || ''} onChange={e => setFormData({ ...formData, address: e.target.value })} />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Observações Privadas</label>
-                <textarea rows={3} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition resize-none" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Alguma observação sobre este cliente?" />
+                <textarea rows={3} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition resize-none" value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Alguma observação sobre este cliente?" />
               </div>
 
               <div className="pt-6 flex space-x-4">
