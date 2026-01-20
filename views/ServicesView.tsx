@@ -31,7 +31,6 @@ const ServicesView: React.FC<ServicesViewProps> = ({ services, onRefresh, userId
     setSaving(true);
     setErrorMsg('');
     try {
-      // Mapeando explicitamente para default_price (snake_case)
       const dataToSave = {
         name: formData.name,
         description: formData.description,
@@ -147,14 +146,14 @@ const ServicesView: React.FC<ServicesViewProps> = ({ services, onRefresh, userId
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[80] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[3rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-10 border-b border-slate-50 flex justify-between items-center">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[80] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[2rem] sm:rounded-[3rem] w-full max-w-lg shadow-2xl my-auto overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 sm:p-10 border-b border-slate-50 flex justify-between items-center">
               <h3 className="text-2xl font-black text-slate-800 tracking-tight">{editingService ? 'Editar Modelo' : 'Novo Serviço'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 p-2 hover:bg-slate-50 rounded-full transition"><X size={28} /></button>
             </div>
             
-            <form onSubmit={handleSave} className="p-10 space-y-6">
+            <form onSubmit={handleSave} className="p-6 sm:p-10 space-y-6">
               {errorMsg && (
                 <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center space-x-2 text-xs font-bold border border-red-100">
                   <AlertCircle size={16} />
@@ -187,9 +186,9 @@ const ServicesView: React.FC<ServicesViewProps> = ({ services, onRefresh, userId
                 </div>
               </div>
 
-              <div className="pt-6 flex space-x-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 text-slate-600 font-bold border border-slate-200 rounded-2xl hover:bg-slate-50 transition">Cancelar</button>
-                <button disabled={saving} type="submit" className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-indigo-100 transition flex items-center justify-center space-x-3 disabled:opacity-50">
+              <div className="pt-6 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="py-4 text-slate-600 font-bold border border-slate-200 rounded-2xl hover:bg-slate-50 transition">Cancelar</button>
+                <button disabled={saving} type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black shadow-xl shadow-indigo-100 transition flex items-center justify-center space-x-3 disabled:opacity-50">
                   {saving ? <Loader2 size={24} className="animate-spin" /> : <span>Salvar no Catálogo</span>}
                 </button>
               </div>

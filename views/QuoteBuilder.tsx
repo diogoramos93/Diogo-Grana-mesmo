@@ -189,11 +189,11 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
 
   return (
     <div className="max-w-5xl mx-auto pb-20 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-        <button onClick={onCancel} className="flex items-center text-slate-400 font-bold hover:text-slate-700 transition px-4 py-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <button onClick={onCancel} className="w-full sm:w-auto flex items-center justify-center text-slate-400 font-bold hover:text-slate-700 transition px-4 py-2">
           <ArrowLeft size={20} className="mr-2" /> Voltar
         </button>
-        <div className="flex items-center space-x-4">
+        <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end space-x-4">
           <div className="text-right">
              <p className="text-[10px] font-black text-slate-400 uppercase leading-none mb-1">Total Final</p>
              <p className="text-xl font-black text-indigo-600">{formatCurrency(totals.total)}</p>
@@ -201,10 +201,10 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
           <button 
             disabled={saving}
             onClick={handleFinalSave} 
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition active:scale-95 disabled:opacity-50"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 sm:px-8 py-3 rounded-xl font-bold flex items-center shadow-lg transition active:scale-95 disabled:opacity-50"
           >
             {saving ? <Loader2 size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
-            <span>Salvar Orçamento</span>
+            <span>Salvar</span>
           </button>
         </div>
       </div>
@@ -217,7 +217,7 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
       )}
 
       <div className="space-y-6">
-        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center space-x-2 text-indigo-600 border-b border-slate-50 pb-4">
             <User size={18} />
             <h3 className="font-bold uppercase text-xs tracking-widest">Identificação</h3>
@@ -245,8 +245,8 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-50 pb-4 gap-3">
             <div className="flex items-center space-x-2 text-indigo-600">
               <FileText size={18} />
               <h3 className="font-bold uppercase text-xs tracking-widest">Serviços</h3>
@@ -291,7 +291,7 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
             <div className="flex items-center space-x-2 text-indigo-600 border-b border-slate-50 pb-4">
               <CreditCard size={18} />
               <h3 className="font-bold uppercase text-xs tracking-widest">Financeiro</h3>
@@ -311,7 +311,7 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
             <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" rows={3} value={formData.paymentConditions} onChange={e => setFormData({ ...formData, paymentConditions: e.target.value })} />
           </div>
 
-          <div className="bg-slate-900 p-8 rounded-3xl text-white shadow-xl flex flex-col justify-between">
+          <div className="bg-slate-900 p-6 sm:p-8 rounded-3xl text-white shadow-xl flex flex-col justify-between">
             <h3 className="text-lg font-bold mb-6 text-indigo-400 uppercase text-xs tracking-widest">Resumo Final</h3>
             <div className="space-y-4">
               <div className="flex justify-between text-slate-400"><span>Subtotal</span><span>{formatCurrency(totals.subtotal)}</span></div>
@@ -330,13 +330,13 @@ const QuoteBuilder: React.FC<QuoteBuilderProps> = ({ profile, clients, services,
       </div>
 
       {showCatalog && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[80vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[2rem] sm:rounded-3xl w-full max-w-xl my-auto max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="p-6 border-b flex justify-between items-center">
                <h3 className="text-xl font-bold text-slate-800">Seu Catálogo</h3>
                <button onClick={() => setShowCatalog(false)} className="p-2"><X size={24} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
               {services.map(s => (
                 <button key={s.id} onClick={() => addFromCatalog(s)} className="w-full text-left p-4 bg-slate-50 border rounded-xl hover:bg-indigo-50 transition flex justify-between items-center">
                    <div>

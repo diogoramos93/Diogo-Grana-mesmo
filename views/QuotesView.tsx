@@ -63,7 +63,6 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
 
       if (error) throw error;
 
-      // Atualiza o estado local para refletir a mudança imediatamente
       setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: newStatus } : q));
     } catch (err: any) {
       console.error("Erro ao mudar status:", err);
@@ -205,26 +204,26 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
       </div>
 
       {previewQuote && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-slate-100 rounded-3xl w-full max-w-5xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-100 rounded-[2rem] sm:rounded-3xl w-full max-w-5xl my-auto shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             <div className="bg-white p-4 border-b border-slate-200 flex justify-between items-center shrink-0">
                <div className="flex items-center space-x-3">
                   <div className="bg-indigo-600 p-2 rounded-lg text-white"><Eye size={20} /></div>
                   <h3 className="font-bold text-slate-800">Visualização do Orçamento</h3>
                </div>
                <div className="flex items-center space-x-2">
-                  <button onClick={() => handleDownloadPDF(previewQuote)} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center space-x-2">
-                    <Download size={16} /> <span>Baixar PDF</span>
+                  <button onClick={() => handleDownloadPDF(previewQuote)} className="bg-indigo-600 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2">
+                    <Download size={16} /> <span className="hidden sm:inline">Baixar PDF</span>
                   </button>
                   <button onClick={() => setPreviewQuote(null)} className="text-slate-400 hover:bg-slate-50 p-2 rounded-lg"><X size={24} /></button>
                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-12 bg-slate-200/50">
-               <div className="bg-white mx-auto w-full max-w-[210mm] shadow-xl p-12 md:p-20 min-h-[297mm] rounded-sm">
-                  <div className="flex justify-between items-start mb-12">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-12 bg-slate-200/50">
+               <div className="bg-white mx-auto w-full max-w-[210mm] shadow-xl p-6 sm:p-12 md:p-20 min-h-[297mm] rounded-sm">
+                  <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-6">
                     <div className="space-y-1">
-                      <h1 className="text-3xl font-black text-indigo-600 tracking-tight leading-none mb-4">{profile?.studioName || profile?.name || currentUser.name}</h1>
+                      <h1 className="text-2xl sm:text-3xl font-black text-indigo-600 tracking-tight leading-none mb-4">{profile?.studioName || profile?.name || currentUser.name}</h1>
                       <div className="text-slate-500 text-[13px] leading-relaxed">
                         <p>{profile?.name || currentUser.name}</p>
                         <p>CNPJ/CPF: {profile?.taxId || '---'}</p>
@@ -232,7 +231,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                         <p>{profile?.address}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="md:text-right w-full md:w-auto">
                       <h2 className="text-2xl font-bold text-slate-800 tracking-tight">ORÇAMENTO</h2>
                       <p className="font-black text-slate-600">#{previewQuote.number}</p>
                       <div className="text-[11px] text-slate-400 font-bold uppercase mt-6 space-y-1">
@@ -244,7 +243,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
 
                   <div className="h-px bg-slate-100 w-full mb-10"></div>
 
-                  <div className="flex justify-between mb-12">
+                  <div className="flex flex-col md:flex-row justify-between mb-12 gap-8">
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Cliente</h3>
                       <div className="space-y-0.5">
@@ -253,40 +252,42 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                         <p className="text-[13px] text-slate-500">{getClientById(previewQuote.clientId)?.address}</p>
                       </div>
                     </div>
-                    <div className="text-right space-y-4">
+                    <div className="md:text-right space-y-4">
                       <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Status</h3>
                       <span className="inline-block bg-indigo-50 text-indigo-600 px-4 py-1 rounded-full text-[11px] font-bold border border-indigo-100 uppercase tracking-wide">{previewQuote.status}</span>
                     </div>
                   </div>
 
-                  <table className="w-full mb-10 text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Serviço</th>
-                        <th className="py-4 px-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">Qtd</th>
-                        <th className="py-4 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {previewQuote.items.map(item => (
-                        <tr key={item.id} className="text-sm">
-                          <td className="py-5 px-4">
-                            <p className="font-bold text-slate-800">{item.name}</p>
-                            {item.description && <p className="text-xs text-slate-400 mt-1">{item.description}</p>}
-                          </td>
-                          <td className="py-5 px-4 text-center">{item.quantity} {item.type}</td>
-                          <td className="py-5 px-4 text-right font-black text-slate-900">{formatCurrency(item.unitPrice * item.quantity)}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full mb-10 text-left border-collapse min-w-[500px]">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">Serviço</th>
+                          <th className="py-4 px-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">Qtd</th>
+                          <th className="py-4 px-4 text-right text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {previewQuote.items.map(item => (
+                          <tr key={item.id} className="text-sm">
+                            <td className="py-5 px-4">
+                              <p className="font-bold text-slate-800">{item.name}</p>
+                              {item.description && <p className="text-xs text-slate-400 mt-1">{item.description}</p>}
+                            </td>
+                            <td className="py-5 px-4 text-center whitespace-nowrap">{item.quantity} {item.type}</td>
+                            <td className="py-5 px-4 text-right font-black text-slate-900 whitespace-nowrap">{formatCurrency(item.unitPrice * item.quantity)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
                   <div className="flex flex-col items-end pt-6 border-t border-slate-50 mb-16">
-                     <div className="flex justify-between w-64 text-sm text-slate-400 mb-2">
+                     <div className="flex justify-between w-full sm:w-64 text-sm text-slate-400 mb-2">
                         <span>Subtotal</span>
                         <span>{formatCurrency(previewQuote.total + (previewQuote.discount || 0))}</span>
                      </div>
-                     <div className="flex justify-between items-center w-72 pt-4">
+                     <div className="flex justify-between items-center w-full sm:w-72 pt-4">
                         <span className="text-xl font-bold text-indigo-600">Total Final</span>
                         <span className="text-2xl font-black text-indigo-600 tracking-tight">{formatCurrency(previewQuote.total)}</span>
                      </div>

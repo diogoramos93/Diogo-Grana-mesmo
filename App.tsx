@@ -5,7 +5,6 @@ import {
   Users, 
   FileText, 
   UserCircle, 
-  PlusCircle, 
   Camera,
   LogOut,
   Menu,
@@ -31,7 +30,6 @@ import { supabase } from './lib/supabase';
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
@@ -73,53 +71,49 @@ const App: React.FC = () => {
           whatsapp: pData.whatsapp || '',
           email: pData.email || '',
           address: pData.address || '',
-          defaultTerms: pData.default_terms || '',
-          monthlyGoal: Number(pData.monthly_goal) || 5000
+          monthlyGoal: Number(pData.monthly_goal) || 5000,
+          defaultTerms: pData.default_terms || ''
         });
       } else {
         isFirstTime = true;
         await supabase.from('profiles').insert({ user_id: userId, email: email || '', name: email?.split('@')[0] || 'Usuário' });
       }
 
-      // Estabiliza o usuário para evitar re-renderizações desnecessárias que causam "piscadas"
-      setCurrentUser(prev => {
-        if (!prev || prev.role !== currentRole || prev.id !== userId) {
-          return {
-            id: userId,
-            username: email || '',
-            name: email?.split('@')[0] || 'Usuário',
-            role: currentRole,
-            isBlocked: false,
-            createdAt: new Date().toISOString()
-          };
-        }
-        return prev;
+      setCurrentUser({
+        id: userId,
+        username: email || '',
+        name: pData?.name || email?.split('@')[0] || 'Usuário',
+        role: currentRole,
+        isBlocked: false,
+        createdAt: new Date().toISOString()
       });
 
-      // Direcionamento inteligente: Se for o primeiro acesso, manda para o perfil
       if (isFirstTime && !hasInitializedRef.current) {
         setActiveTab('profile');
       }
 
-      const { data: cData } = await supabase.from('clients').select('*').eq('user_id', userId).order('name');
-      if (cData) {
-        setClients(cData.map(c => ({ 
+      const [clientsRes, servicesRes, quotesRes] = await Promise.all([
+        supabase.from('clients').select('*').eq('user_id', userId).order('name'),
+        supabase.from('services').select('*').eq('user_id', userId).order('name'),
+        supabase.from('quotes').select('*, items:quote_items(*)').eq('user_id', userId).order('created_at', { ascending: false })
+      ]);
+
+      if (clientsRes.data) {
+        setClients(clientsRes.data.map(c => ({ 
           id: c.id, name: c.name, email: c.email || '', phone: c.phone || '', taxId: c.tax_id || '', 
           address: c.address || '', type: (c.type as 'PF'|'PJ') || 'PF', notes: c.notes || ''
         })));
       }
 
-      const { data: sData } = await supabase.from('services').select('*').eq('user_id', userId).order('name');
-      if (sData) {
-        setServices(sData.map(s => ({ 
+      if (servicesRes.data) {
+        setServices(servicesRes.data.map(s => ({ 
           id: s.id, name: s.name, description: s.description || '', 
           defaultPrice: Number(s.default_price) || 0, type: (s.type as ServiceType) || ServiceType.PACKAGE
         })));
       }
 
-      const { data: qData } = await supabase.from('quotes').select('*, items:quote_items(*)').eq('user_id', userId).order('created_at', { ascending: false });
-      if (qData) {
-        setQuotes(qData.map(q => ({
+      if (quotesRes.data) {
+        setQuotes(quotesRes.data.map(q => ({
           id: q.id, number: q.number, clientId: q.client_id, date: q.date, validUntil: q.valid_until,
           status: q.status as QuoteStatus, discount: Number(q.discount) || 0, extraFees: Number(q.extra_fees) || 0,
           paymentMethod: q.payment_method as PaymentMethod, paymentConditions: q.payment_conditions || '', total: Number(q.total) || 0,
@@ -132,7 +126,6 @@ const App: React.FC = () => {
       hasInitializedRef.current = true;
     } catch (err: any) {
       console.error("Erro no sincronismo:", err);
-      setError(err.message);
     } finally {
       setSyncing(false);
       isSyncingRef.current = false;
@@ -141,27 +134,36 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const init = async () => {
+    let mounted = true;
+
+    const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await loadData(session.user.id, session.user.email);
-      } else {
-        setLoading(false);
+      if (mounted) {
+        if (session) {
+          await loadData(session.user.id, session.user.email);
+        } else {
+          setLoading(false);
+        }
       }
     };
-    init();
+
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-        await loadData(session.user.id, session.user.email);
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        hasInitializedRef.current = false;
-        setLoading(false);
+      if (mounted) {
+        if (session) {
+          loadData(session.user.id, session.user.email);
+        } else {
+          setLoading(false);
+          setCurrentUser(null);
+        }
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [loadData]);
 
   if (isPublicView && publicQuoteId && publicUserId) return <PublicQuoteView quoteId={publicQuoteId} userId={publicUserId} />;
