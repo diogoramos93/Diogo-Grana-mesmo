@@ -1,223 +1,232 @@
+
 import React, { useState } from 'react';
 import { Client } from '../types';
-import { Search, UserPlus, Edit2, Trash2, Mail, Phone, MapPin, X } from 'lucide-react';
+import { Search, UserPlus, Edit2, Trash2, Mail, Phone, MapPin, X, Loader2, AlertCircle, Users, CreditCard, FileText } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface ClientsViewProps {
   clients: Client[];
-  setClients: React.Dispatch<React.SetStateAction<Client[]>>;
+  onRefresh: () => Promise<void>;
+  userId: string;
 }
 
-const ClientsView: React.FC<ClientsViewProps> = ({ clients, setClients }) => {
+const ClientsView: React.FC<ClientsViewProps> = ({ clients, onRefresh, userId }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const [formData, setFormData] = useState<Partial<Client>>({
-    name: '',
-    email: '',
-    phone: '',
-    taxId: '',
-    address: '',
-    type: 'PF',
-    notes: ''
+    name: '', email: '', phone: '', taxId: '', address: '', type: 'PF', notes: ''
   });
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredClients = (clients || []).filter(c => 
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingClient) {
-      setClients(clients.map(c => c.id === editingClient.id ? { ...editingClient, ...formData } as Client : c));
-    } else {
-      const newClient: Client = {
-        ...formData,
-        id: Date.now().toString(),
-      } as Client;
-      setClients([...clients, newClient]);
+    if (!formData.name || saving) return;
+    setSaving(true);
+    setErrorMsg('');
+    
+    try {
+      // Mapeando explicitamente para os nomes de coluna do banco (snake_case)
+      const dataToSave = {
+        user_id: userId,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        tax_id: formData.taxId,
+        address: formData.address,
+        type: formData.type,
+        notes: formData.notes
+      };
+
+      if (editingClient) {
+        const { error } = await supabase.from('clients').update(dataToSave).eq('id', editingClient.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('clients').insert([dataToSave]);
+        if (error) throw error;
+      }
+      
+      await onRefresh();
+      setIsModalOpen(false);
+      resetForm();
+    } catch (err: any) {
+      console.error("Erro ao salvar cliente:", err);
+      setErrorMsg(err.message || 'Erro ao salvar cliente no banco.');
+    } finally {
+      setSaving(false);
     }
-    setIsModalOpen(false);
-    resetForm();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
+      try {
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+        await onRefresh();
+      } catch (err: any) {
+        alert("Erro ao excluir: " + err.message);
+      }
+    }
   };
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
-    setFormData(client);
+    setFormData({ ...client });
     setIsModalOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Tem certeza que deseja remover este cliente?')) {
-      setClients(clients.filter(c => c.id !== id));
-    }
   };
 
   const resetForm = () => {
     setEditingClient(null);
+    setErrorMsg('');
     setFormData({ name: '', email: '', phone: '', taxId: '', address: '', type: 'PF', notes: '' });
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
             type="text" 
-            placeholder="Buscar clientes..." 
-            className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+            placeholder="Filtrar clientes por nome..." 
+            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-50 outline-none transition shadow-sm font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold transition shadow-md"
+          className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-indigo-100 transition active:scale-95"
         >
           <UserPlus size={20} />
-          <span>Novo Cliente</span>
+          <span>Cadastrar Novo Cliente</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredClients.map(client => (
-          <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition group">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="h-12 w-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 border border-slate-100 font-bold group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
-                  {client.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          <div key={client.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center space-x-4">
+                <div className="h-14 w-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center text-indigo-600 border border-indigo-100 font-black text-xl uppercase">
+                  {client.name.charAt(0)}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 leading-tight">{client.name}</h3>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${client.type === 'PF' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                  <h3 className="font-black text-slate-800 leading-none text-lg">{client.name}</h3>
+                  <span className={`inline-block mt-2 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border ${client.type === 'PF' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
                     {client.type === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica'}
                   </span>
                 </div>
               </div>
-              <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition">
-                <button onClick={() => handleEdit(client)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg">
-                  <Edit2 size={16} />
-                </button>
-                <button onClick={() => handleDelete(client.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                  <Trash2 size={16} />
-                </button>
+              <div className="flex space-x-1">
+                <button onClick={() => handleEdit(client)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition"><Edit2 size={18} /></button>
+                <button onClick={() => handleDelete(client.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition"><Trash2 size={18} /></button>
               </div>
             </div>
 
-            <div className="space-y-2 text-sm text-slate-500">
-              <div className="flex items-center space-x-2">
-                <Mail size={14} className="text-slate-400" />
-                <span className="truncate">{client.email}</span>
+            <div className="space-y-4 text-sm text-slate-500">
+              <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <Mail size={18} className="text-slate-400" />
+                <span className="truncate font-bold">{client.email || 'E-mail não informado'}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <Phone size={14} className="text-slate-400" />
-                <span>{client.phone}</span>
+              <div className="flex items-center space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <Phone size={18} className="text-slate-400" />
+                <span className="font-bold">{client.phone || 'Sem telefone'}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <MapPin size={14} className="text-slate-400" />
-                <span className="truncate">{client.address || 'Endereço não informado'}</span>
-              </div>
+              {client.address && (
+                <div className="flex items-start space-x-3 p-1">
+                  <MapPin size={18} className="text-slate-400 mt-0.5 shrink-0" />
+                  <span className="text-xs font-medium leading-relaxed">{client.address}</span>
+                </div>
+              )}
             </div>
           </div>
         ))}
         {filteredClients.length === 0 && (
-          <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400">
-            Nenhum cliente encontrado.
+          <div className="col-span-full py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-400 flex flex-col items-center">
+            <Users size={48} className="mb-4 opacity-20" />
+            <p className="font-black uppercase tracking-widest text-xs">Nenhum cliente encontrado</p>
           </div>
         )}
       </div>
 
-      {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-800">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-50">
-                <X size={24} />
-              </button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[80] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-10 border-b border-slate-50 flex justify-between items-center">
+              <div>
+                <h3 className="text-3xl font-black text-slate-800 tracking-tight">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h3>
+                <p className="text-slate-500 font-medium">Cadastre os dados completos para emissão do contrato.</p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 p-2 hover:bg-slate-50 rounded-full transition"><X size={28} /></button>
             </div>
-            <form onSubmit={handleSave} className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
-                <input 
-                  required
-                  type="text" 
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                  value={formData.name}
-                  onChange={e => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
+            
+            <form onSubmit={handleSave} className="p-10 space-y-6">
+              {errorMsg && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-2xl flex items-center space-x-2 text-xs font-bold border border-red-100 animate-in shake">
+                  <AlertCircle size={16} />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">E-mail</label>
-                  <input 
-                    type="email" 
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                    value={formData.email}
-                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                  <input required type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition font-medium" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Telefone</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                    value={formData.phone}
-                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">CPF / CNPJ</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                    value={formData.taxId}
-                    onChange={e => setFormData({ ...formData, taxId: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Tipo</label>
-                  <select 
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                    value={formData.type}
-                    onChange={e => setFormData({ ...formData, type: e.target.value as 'PF' | 'PJ' })}
-                  >
-                    <option value="PF">Pessoa Física</option>
-                    <option value="PJ">Pessoa Jurídica</option>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Cliente</label>
+                  <select className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition font-bold" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as 'PF' | 'PJ' })}>
+                    <option value="PF">Pessoa Física (CPF)</option>
+                    <option value="PJ">Pessoa Jurídica (CNPJ)</option>
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Endereço</label>
-                <input 
-                  type="text" 
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
-                  value={formData.address}
-                  onChange={e => setFormData({ ...formData, address: e.target.value })}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
+                  <input type="email" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">WhatsApp</label>
+                  <input type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                </div>
               </div>
 
-              <div className="pt-4 flex space-x-3">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-3 text-slate-600 font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-2 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition"
-                >
-                  Salvar Cliente
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">CPF ou CNPJ</label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <input type="text" className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Endereço Completo</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                    <input type="text" className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Observações Privadas</label>
+                <textarea rows={3} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition resize-none" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Alguma observação sobre este cliente?" />
+              </div>
+
+              <div className="pt-6 flex space-x-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 text-slate-600 font-bold border border-slate-200 rounded-2xl hover:bg-slate-50 transition">Cancelar</button>
+                <button disabled={saving} type="submit" className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl font-black shadow-xl shadow-indigo-100 transition flex items-center justify-center space-x-3 disabled:opacity-50">
+                  {saving ? <Loader2 size={24} className="animate-spin" /> : <span>Confirmar Cadastro</span>}
                 </button>
               </div>
             </form>

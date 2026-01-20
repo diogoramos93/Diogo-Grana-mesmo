@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { PhotographerProfile } from '../types';
-import { Save, Camera, Mail, Phone, MapPin, Globe, Instagram, CreditCard, Target } from 'lucide-react';
+import { Save, Camera, Mail, Phone, MapPin, CreditCard, Target, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface InputFieldProps {
   label: string;
@@ -15,15 +16,15 @@ interface InputFieldProps {
 
 const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, field, placeholder, type = 'text', onChange }) => (
   <div className="space-y-1">
-    <label className="text-xs font-bold text-slate-500 uppercase">{label}</label>
+    <label className="text-xs font-bold text-slate-500 uppercase ml-1">{label}</label>
     <div className="relative">
-      <div className="absolute left-3 top-3 text-slate-400">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
         <Icon size={18} />
       </div>
       <input 
         type={type}
         placeholder={placeholder}
-        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
+        className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-50 outline-none transition-all font-medium"
         value={value || ''}
         onChange={e => {
           const val = type === 'number' ? Number(e.target.value) : e.target.value;
@@ -37,12 +38,51 @@ const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, field
 interface ProfileViewProps {
   profile: PhotographerProfile;
   setProfile: React.Dispatch<React.SetStateAction<PhotographerProfile>>;
+  userId: string;
+  onRefresh: () => Promise<void>;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
-  const handleSave = (e: React.FormEvent) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile, userId, onRefresh }) => {
+  const [saving, setSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Perfil salvo com sucesso!');
+    if (saving) return;
+    setSaving(true);
+    setErrorMsg('');
+    setShowSuccess(false);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: userId,
+          name: profile.name,
+          studio_name: profile.studioName,
+          tax_id: profile.taxId,
+          phone: profile.phone,
+          whatsapp: profile.whatsapp,
+          email: profile.email,
+          address: profile.address,
+          website: profile.website,
+          instagram: profile.instagram,
+          default_terms: profile.defaultTerms,
+          monthly_goal: profile.monthlyGoal
+        });
+      
+      if (error) throw error;
+      
+      setShowSuccess(true);
+      await onRefresh();
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      console.error("Erro ao salvar:", err);
+      setErrorMsg(err.message || 'Erro de conexão com o Supabase.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateProfile = (field: keyof PhotographerProfile, value: any) => {
@@ -50,103 +90,99 @@ const ProfileView: React.FC<ProfileViewProps> = ({ profile, setProfile }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      <form onSubmit={handleSave} className="space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-4xl mx-auto p-6 md:p-10 pb-20 animate-in fade-in duration-500">
+      <div className="mb-10">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Configurações do Perfil</h1>
+        <p className="text-slate-500 font-medium">Os dados abaixo sairão no topo de todos os seus PDFs.</p>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-8">
         <div className="flex flex-col md:flex-row gap-8 items-start">
-          {/* Sidebar Info */}
           <div className="w-full md:w-1/3 space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm text-center">
-              <div className="relative inline-block mb-4">
-                <div className="h-24 w-24 bg-indigo-50 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-600">
-                  <Camera size={32} />
+            <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 text-center">
+              <div className="relative inline-block mb-6">
+                <div className="h-32 w-32 bg-indigo-50 rounded-[2.5rem] flex items-center justify-center text-indigo-600 border-2 border-dashed border-indigo-200">
+                  <Camera size={48} />
                 </div>
-                <button type="button" className="absolute bottom-0 right-0 bg-white shadow-md p-1.5 rounded-full text-slate-600 border border-slate-100 hover:text-indigo-600">
-                  <Save size={14} />
-                </button>
               </div>
-              <h3 className="font-bold text-slate-800 text-lg">{profile.studioName || profile.name}</h3>
-              <p className="text-slate-500 text-sm">Fotógrafo Profissional</p>
+              <h3 className="font-black text-slate-800 text-xl leading-tight">{profile.studioName || profile.name || 'Seu Estúdio'}</h3>
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mt-1">Status: Ativo</p>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-              <h4 className="font-bold text-slate-800 text-sm flex items-center uppercase tracking-wider">
-                <Target size={16} className="mr-2 text-indigo-600" /> Meta do Mês
-              </h4>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Valor Alvo (R$)</label>
-                <input 
-                  type="number" 
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition font-bold text-indigo-600"
-                  value={profile.monthlyGoal}
-                  onChange={e => updateProfile('monthlyGoal', Number(e.target.value))}
-                />
-                <p className="text-[10px] text-slate-400 mt-1 italic">Este valor será usado para calcular seu progresso no Dashboard.</p>
+            <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl space-y-6">
+              <div className="flex items-center space-x-3 text-indigo-400">
+                <Target size={24} />
+                <h4 className="font-black uppercase text-xs tracking-[2px]">Meta Mensal</h4>
               </div>
-            </div>
-
-            <div className="bg-indigo-900 p-6 rounded-3xl text-white shadow-lg">
-              <h4 className="font-bold mb-4 flex items-center"><Globe size={18} className="mr-2" /> Presença Online</h4>
-              <div className="space-y-4">
-                <InputField 
-                  label="Website" 
-                  icon={Globe} 
-                  value={profile.website || ''} 
-                  field="website" 
-                  placeholder="Seu site oficial" 
-                  onChange={updateProfile} 
-                />
-                <InputField 
-                  label="Instagram" 
-                  icon={Instagram} 
-                  value={profile.instagram || ''} 
-                  field="instagram" 
-                  placeholder="@seufotografo" 
-                  onChange={updateProfile} 
-                />
+              <div className="space-y-2">
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-indigo-400">R$</span>
+                  <input 
+                    type="number" 
+                    className="w-full pl-12 pr-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-black text-indigo-400 text-xl"
+                    value={profile.monthlyGoal}
+                    onChange={e => updateProfile('monthlyGoal', Number(e.target.value))}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Form Content */}
           <div className="flex-1 space-y-6">
-            <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-              <h3 className="text-xl font-bold text-slate-800 pb-4 border-b border-slate-50">Dados Profissionais</h3>
+            {errorMsg && (
+              <div className="bg-red-50 border border-red-100 text-red-600 p-6 rounded-3xl flex items-start space-x-3 text-sm font-bold animate-in shake">
+                <AlertCircle size={20} className="shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+            
+            <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 space-y-8">
+              <div className="flex justify-between items-center border-b border-slate-50 pb-6">
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight">Informações Principais</h3>
+                {showSuccess && (
+                  <div className="flex items-center text-emerald-600 text-sm font-black animate-in slide-in-from-right">
+                    <CheckCircle size={18} className="mr-2" /> Alterações Salvas!
+                  </div>
+                )}
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="Nome Completo" icon={Camera} value={profile.name} field="name" onChange={updateProfile} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField label="Seu Nome" icon={Camera} value={profile.name} field="name" onChange={updateProfile} />
                 <InputField label="Nome do Estúdio" icon={Camera} value={profile.studioName || ''} field="studioName" onChange={updateProfile} />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField label="CPF / CNPJ" icon={CreditCard} value={profile.taxId} field="taxId" onChange={updateProfile} />
-                <InputField label="Telefone" icon={Phone} value={profile.phone} field="phone" onChange={updateProfile} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField label="CPF ou CNPJ" icon={CreditCard} value={profile.taxId} field="taxId" onChange={updateProfile} />
                 <InputField label="WhatsApp" icon={Phone} value={profile.whatsapp} field="whatsapp" onChange={updateProfile} />
-                <InputField label="E-mail" icon={Mail} value={profile.email} field="email" type="email" onChange={updateProfile} />
               </div>
 
-              <InputField label="Endereço Comercial" icon={MapPin} value={profile.address} field="address" onChange={updateProfile} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <InputField label="E-mail" icon={Mail} value={profile.email} field="email" type="email" onChange={updateProfile} />
+                <InputField label="Telefone Fixo" icon={Phone} value={profile.phone || ''} field="phone" onChange={updateProfile} />
+              </div>
 
-              <div className="space-y-1 pt-4">
-                <label className="text-xs font-bold text-slate-500 uppercase">Termos Padrão do Orçamento</label>
+              <InputField label="Endereço Profissional" icon={MapPin} value={profile.address} field="address" onChange={updateProfile} />
+
+              <div className="space-y-2 pt-4 border-t border-slate-50">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Termos e Condições Padrão</label>
                 <textarea 
                   rows={4}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition"
+                  className="w-full px-6 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-medium text-slate-600"
                   value={profile.defaultTerms}
                   onChange={e => updateProfile('defaultTerms', e.target.value)}
-                  placeholder="Ex: Política de cancelamento, prazos de entrega..."
+                  placeholder="Ex: Reserva 30%..."
                 />
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4">
               <button 
+                disabled={saving}
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-200 flex items-center transition active:scale-95"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-[2rem] font-black text-lg shadow-2xl shadow-indigo-200 flex items-center transition-all active:scale-95 disabled:opacity-50"
               >
-                <Save size={20} className="mr-2" /> Salvar Alterações
+                {saving ? <Loader2 size={24} className="animate-spin mr-3" /> : <Save size={24} className="mr-3" />}
+                {saving ? 'SALVANDO...' : 'SALVAR ALTERAÇÕES'}
               </button>
             </div>
           </div>

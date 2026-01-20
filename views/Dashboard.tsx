@@ -1,26 +1,25 @@
 
 import React from 'react';
 import { Quote, QuoteStatus, PhotographerProfile } from '../types';
-import { TrendingUp, FileText, CheckCircle, Clock, ArrowRight } from 'lucide-react';
+import { TrendingUp, FileText, CheckCircle, Clock, ArrowRight, PlusCircle, Users, Briefcase } from 'lucide-react';
 
 interface DashboardProps {
   quotes: Quote[];
   profile: PhotographerProfile;
   onNewQuote: () => void;
   onViewQuotes: () => void;
+  onGoToClients: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ quotes, profile, onNewQuote, onViewQuotes }) => {
+const Dashboard: React.FC<DashboardProps> = ({ quotes, profile, onNewQuote, onViewQuotes, onGoToClients }) => {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
 
-  // Faturamento total aprovado (geral)
   const totalRevenue = quotes
     .filter(q => q.status === QuoteStatus.APPROVED)
     .reduce((sum, q) => sum + q.total, 0);
 
-  // Faturamento aprovado APENAS no mês atual para a meta
   const currentMonthRevenue = quotes
     .filter(q => {
       const qDate = new Date(q.date);
@@ -33,27 +32,22 @@ const Dashboard: React.FC<DashboardProps> = ({ quotes, profile, onNewQuote, onVi
   const stats = {
     total: quotes.length,
     approved: quotes.filter(q => q.status === QuoteStatus.APPROVED).length,
-    pending: quotes.filter(q => q.status === QuoteStatus.SENT || q.status === QuoteStatus.DRAFT).length,
+    pending: quotes.filter(q => q.status === QuoteStatus.SENT || q.status === QuoteStatus.DRAFT || q.status === QuoteStatus.VIEWED).length,
     revenue: totalRevenue
   };
 
   const recentQuotes = [...quotes].sort((a, b) => b.id.localeCompare(a.id)).slice(0, 5);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
-
-  // Cálculo da Meta
+  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   const goalValue = profile.monthlyGoal || 5000;
   const progressPercent = Math.min(Math.round((currentMonthRevenue / goalValue) * 100), 100);
 
   const StatCard = ({ title, value, icon: Icon, colorClass, bgColorClass }: any) => (
-    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
       <div>
-        <p className="text-slate-500 text-sm font-medium">{title}</p>
-        <h3 className="text-2xl font-bold text-slate-800 mt-1">{value}</h3>
+        <p className="text-slate-400 text-xs font-black uppercase tracking-widest">{title}</p>
+        <h3 className="text-2xl font-black text-slate-900 mt-1">{value}</h3>
       </div>
-      <div className={`${bgColorClass} p-3 rounded-xl ${colorClass}`}>
+      <div className={`${bgColorClass} p-4 rounded-2xl ${colorClass} shadow-inner`}>
         <Icon size={24} />
       </div>
     </div>
@@ -61,121 +55,107 @@ const Dashboard: React.FC<DashboardProps> = ({ quotes, profile, onNewQuote, onVi
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Bem-vindo de volta!</h1>
-          <p className="text-slate-500">Aqui está o resumo da sua produtividade fotográfica.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Olá, {profile.name.split(' ')[0]}! 📸</h1>
+          <p className="text-slate-500 font-medium mt-3">Você tem {stats.pending} orçamentos aguardando aprovação.</p>
         </div>
-        <button 
-          onClick={onNewQuote}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95"
-        >
-          Novo Orçamento
-        </button>
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={onNewQuote}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-indigo-100 transition-all active:scale-95 flex items-center space-x-2"
+          >
+            <PlusCircle size={20} />
+            <span>Criar Novo Orçamento</span>
+          </button>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Faturamento Aprovado" 
-          value={formatCurrency(stats.revenue)} 
-          icon={TrendingUp} 
-          colorClass="text-emerald-600" 
-          bgColorClass="bg-emerald-50" 
-        />
-        <StatCard 
-          title="Total de Orçamentos" 
-          value={stats.total} 
-          icon={FileText} 
-          colorClass="text-indigo-600" 
-          bgColorClass="bg-indigo-50" 
-        />
-        <StatCard 
-          title="Aprovados" 
-          value={stats.approved} 
-          icon={CheckCircle} 
-          colorClass="text-blue-600" 
-          bgColorClass="bg-blue-50" 
-        />
-        <StatCard 
-          title="Pendentes" 
-          value={stats.pending} 
-          icon={Clock} 
-          colorClass="text-amber-600" 
-          bgColorClass="bg-amber-50" 
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard title="Faturamento Total" value={formatCurrency(stats.revenue)} icon={TrendingUp} colorClass="text-emerald-600" bgColorClass="bg-emerald-50" />
+        <StatCard title="Total Criado" value={stats.total} icon={FileText} colorClass="text-indigo-600" bgColorClass="bg-indigo-50" />
+        <StatCard title="Total Aprovado" value={stats.approved} icon={CheckCircle} colorClass="text-blue-600" bgColorClass="bg-blue-50" />
+        <StatCard title="Em Aberto" value={stats.pending} icon={Clock} colorClass="text-amber-600" bgColorClass="bg-amber-50" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Quotes */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-bold text-slate-800">Orçamentos Recentes</h3>
-            <button 
-              onClick={onViewQuotes}
-              className="text-indigo-600 text-sm font-semibold flex items-center hover:underline"
-            >
-              Ver todos <ArrowRight size={16} className="ml-1" />
+        <div className="lg:col-span-2 space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button onClick={onGoToClients} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition text-left group">
+              <div className="bg-blue-50 w-12 h-12 rounded-xl flex items-center justify-center text-blue-600 mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Users size={24} /></div>
+              <h4 className="font-black text-slate-800 tracking-tight">Gerenciar Clientes</h4>
+              <p className="text-slate-500 text-sm mt-1">Acesse sua base de contatos.</p>
+            </button>
+            <button onClick={onViewQuotes} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition text-left group">
+              <div className="bg-purple-50 w-12 h-12 rounded-xl flex items-center justify-center text-purple-600 mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors"><FileText size={24} /></div>
+              <h4 className="font-black text-slate-800 tracking-tight">Lista de Orçamentos</h4>
+              <p className="text-slate-500 text-sm mt-1">Veja todos os documentos gerados.</p>
             </button>
           </div>
-          <div className="divide-y divide-slate-50">
-            {recentQuotes.length > 0 ? (
-              recentQuotes.map(quote => (
-                <div key={quote.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition">
-                  <div className="flex items-center space-x-4">
-                    <div className="h-10 w-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600">
-                      <FileText size={20} />
+
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="font-black text-xl text-slate-900 tracking-tight">Últimos Orçamentos</h3>
+              <button onClick={onViewQuotes} className="text-indigo-600 text-sm font-black flex items-center hover:underline uppercase tracking-widest">Ver Todos <ArrowRight size={14} className="ml-2" /></button>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {recentQuotes.length > 0 ? (
+                recentQuotes.map(quote => (
+                  <div key={quote.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition">
+                    <div className="flex items-center space-x-5">
+                      <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400"><FileText size={24} /></div>
+                      <div>
+                        <p className="font-black text-slate-900 tracking-tight">#{quote.number}</p>
+                        <p className="text-sm text-slate-400 font-medium">{new Date(quote.date).toLocaleDateString('pt-BR')}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-slate-800">#{quote.number}</p>
-                      <p className="text-sm text-slate-500">{new Date(quote.date).toLocaleDateString('pt-BR')}</p>
+                    <div className="text-right">
+                      <p className="font-black text-slate-900 text-lg">{formatCurrency(quote.total)}</p>
+                      <span className={`text-[10px] uppercase font-black px-3 py-1 rounded-full border ${
+                        quote.status === QuoteStatus.APPROVED ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                        quote.status === QuoteStatus.DECLINED ? 'bg-red-50 text-red-700 border-red-100' :
+                        'bg-slate-50 text-slate-500 border-slate-200'
+                      }`}>
+                        {quote.status}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-slate-800">{formatCurrency(quote.total)}</p>
-                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                      quote.status === QuoteStatus.APPROVED ? 'bg-emerald-100 text-emerald-700' :
-                      quote.status === QuoteStatus.DECLINED ? 'bg-red-100 text-red-700' :
-                      'bg-slate-100 text-slate-600'
-                    }`}>
-                      {quote.status}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-12 text-center text-slate-400">
-                Nenhum orçamento criado ainda.
-              </div>
-            )}
+                ))
+              ) : (
+                <div className="p-20 text-center text-slate-400 font-medium">Você ainda não criou nenhum orçamento.</div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Dynamic Goal Progress */}
-        <div className="bg-indigo-900 rounded-2xl p-6 text-white shadow-xl flex flex-col justify-between">
-          <div>
-            <h3 className="text-xl font-bold mb-2">Sua Meta 📸</h3>
-            <p className="text-indigo-200 text-sm leading-relaxed">
-              Você já faturou <span className="text-white font-bold">{formatCurrency(currentMonthRevenue)}</span> este mês. 
-              {progressPercent >= 100 
-                ? " Parabéns! Você atingiu sua meta mensal!" 
-                : ` Faltam ${formatCurrency(goalValue - currentMonthRevenue)} para o seu objetivo.`}
-            </p>
-          </div>
-          <div className="mt-8 bg-indigo-800/50 p-4 rounded-xl border border-indigo-700">
-            <div className="flex justify-between items-center mb-2">
-              <p className="text-xs text-indigo-300 uppercase font-bold">Progresso Mensal</p>
-              <p className="text-xs text-white font-bold">{progressPercent}%</p>
+        <div className="space-y-6">
+          <div className="bg-indigo-900 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-indigo-200 flex flex-col justify-between h-full min-h-[400px]">
+            <div>
+              <div className="bg-indigo-800/50 w-14 h-14 rounded-2xl flex items-center justify-center mb-6"><TrendingUp size={32} /></div>
+              <h3 className="text-2xl font-black tracking-tight leading-tight mb-4">Meta de Faturamento Mensal</h3>
+              <p className="text-indigo-200 font-medium leading-relaxed">
+                Você faturou <span className="text-white font-black text-lg">{formatCurrency(currentMonthRevenue)}</span> neste mês.
+              </p>
             </div>
-            <div className="w-full bg-indigo-950 h-3 rounded-full overflow-hidden">
-              <div 
-                className={`h-full rounded-full shadow-[0_0_8px_rgba(52,211,153,0.5)] transition-all duration-1000 ${
-                  progressPercent >= 100 ? 'bg-emerald-400' : 'bg-indigo-400'
-                }`}
-                style={{ width: `${progressPercent}%` }}
-              ></div>
+            
+            <div className="mt-auto space-y-4 pt-10 border-t border-indigo-800">
+              <div className="flex justify-between items-end">
+                <p className="text-xs font-black text-indigo-400 uppercase tracking-widest">Progresso</p>
+                <p className="text-3xl font-black text-white">{progressPercent}%</p>
+              </div>
+              <div className="w-full bg-indigo-950/50 h-5 rounded-full overflow-hidden border border-indigo-800">
+                <div 
+                  className={`h-full rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(129,140,248,0.5)] ${
+                    progressPercent >= 100 ? 'bg-emerald-400' : 'bg-indigo-500'
+                  }`}
+                  style={{ width: `${progressPercent}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                <span>R$ 0</span>
+                <span>Alvo: {formatCurrency(goalValue)}</span>
+              </div>
             </div>
-            <p className="text-right text-[10px] mt-2 text-indigo-200 italic">Meta: {formatCurrency(goalValue)}</p>
           </div>
         </div>
       </div>

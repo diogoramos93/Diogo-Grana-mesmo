@@ -13,9 +13,11 @@ import {
   AlertCircle,
   Eye,
   X,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ChevronDown
 } from 'lucide-react';
 import { generateQuotePDF } from '../services/pdfService';
+import { supabase } from '../lib/supabase';
 
 interface QuotesViewProps {
   quotes: Quote[];
@@ -24,22 +26,16 @@ interface QuotesViewProps {
   currentUser: User;
   onEditQuote: (id: string) => void;
   onNewQuote: () => void;
+  profile?: PhotographerProfile;
 }
 
-const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, currentUser, onEditQuote, onNewQuote }) => {
+const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, currentUser, onEditQuote, onNewQuote, profile }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [previewQuote, setPreviewQuote] = useState<Quote | null>(null);
 
   const getClientById = (clientId: string) => {
     return clients.find(c => c.id === clientId);
-  };
-
-  const getProfile = (): PhotographerProfile => {
-    const saved = localStorage.getItem(`photo_profile_${currentUser.id}`);
-    return saved ? JSON.parse(saved) : {
-      name: currentUser.name, taxId: '', phone: '', whatsapp: '', email: '', address: '', defaultTerms: '', monthlyGoal: 5000
-    };
   };
 
   const filteredQuotes = quotes.filter(q => {
@@ -50,16 +46,37 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
     return matchesSearch && matchesStatus;
   });
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Excluir este orçamento permanentemente?')) {
-      setQuotes(quotes.filter(q => q.id !== id));
+      const { error } = await supabase.from('quotes').delete().eq('id', id);
+      if (error) alert('Erro ao deletar: ' + error.message);
+      else setQuotes(quotes.filter(q => q.id !== id));
+    }
+  };
+
+  const handleStatusChange = async (quoteId: string, newStatus: QuoteStatus) => {
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: newStatus })
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      // Atualiza o estado local para refletir a mudança imediatamente
+      setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: newStatus } : q));
+    } catch (err: any) {
+      console.error("Erro ao mudar status:", err);
+      alert('Não foi possível atualizar o status: ' + err.message);
     }
   };
 
   const handleDownloadPDF = (quote: Quote) => {
     const client = getClientById(quote.clientId);
-    const profile = getProfile();
-    if (client) generateQuotePDF(quote, profile, client);
+    const activeProfile = profile || {
+      name: currentUser.name, taxId: '', phone: '', whatsapp: '', email: currentUser.username, address: '', defaultTerms: '', monthlyGoal: 5000
+    };
+    if (client) generateQuotePDF(quote, activeProfile, client);
   };
 
   const generatePublicLink = (quote: Quote) => {
@@ -88,19 +105,20 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
 
   const getStatusIcon = (status: QuoteStatus) => {
     switch (status) {
-      case QuoteStatus.APPROVED: return <CheckCircle size={16} className="text-emerald-500" />;
-      case QuoteStatus.DECLINED: return <AlertCircle size={16} className="text-red-500" />;
-      case QuoteStatus.SENT: return <Clock size={16} className="text-indigo-500" />;
-      default: return <FileText size={16} className="text-slate-400" />;
+      case QuoteStatus.APPROVED: return <CheckCircle size={14} className="text-emerald-500" />;
+      case QuoteStatus.DECLINED: return <AlertCircle size={14} className="text-red-500" />;
+      case QuoteStatus.SENT: return <Clock size={14} className="text-indigo-500" />;
+      default: return <FileText size={14} className="text-slate-400" />;
     }
   };
 
   const getStatusClass = (status: QuoteStatus) => {
     switch (status) {
-      case QuoteStatus.APPROVED: return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-      case QuoteStatus.DECLINED: return 'bg-red-50 text-red-700 border-red-100';
-      case QuoteStatus.SENT: return 'bg-indigo-50 text-indigo-700 border-indigo-100';
-      default: return 'bg-slate-100 text-slate-600 border-slate-200';
+      case QuoteStatus.APPROVED: return 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100';
+      case QuoteStatus.DECLINED: return 'bg-red-50 text-red-700 border-red-100 hover:bg-red-100';
+      case QuoteStatus.SENT: return 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100';
+      case QuoteStatus.VIEWED: return 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100';
+      default: return 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
     }
   };
 
@@ -119,11 +137,11 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
             />
           </div>
           <select 
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+            className="px-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-600"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="all">Todos Status</option>
+            <option value="all">Filtrar Status</option>
             {Object.values(QuoteStatus).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
@@ -141,7 +159,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Total</th>
-                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Status (Clique para mudar)</th>
                 <th className="px-6 py-4 text-right">Ações</th>
               </tr>
             </thead>
@@ -153,10 +171,24 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                   <td className="px-6 py-4 whitespace-nowrap text-slate-500">{new Date(quote.date).toLocaleDateString('pt-BR')}</td>
                   <td className="px-6 py-4 whitespace-nowrap font-bold text-indigo-600">{formatCurrency(quote.total)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusClass(quote.status)}`}>
-                      {getStatusIcon(quote.status)}
-                      <span>{quote.status}</span>
-                    </span>
+                    <div className="relative group/status">
+                      <div className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-black border transition-all cursor-pointer ${getStatusClass(quote.status)}`}>
+                        {getStatusIcon(quote.status)}
+                        <span className="uppercase tracking-wider">{quote.status}</span>
+                        <ChevronDown size={12} className="opacity-40" />
+                      </div>
+                      <select 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        value={quote.status}
+                        onChange={(e) => handleStatusChange(quote.id, e.target.value as QuoteStatus)}
+                      >
+                        {Object.values(QuoteStatus).map(status => (
+                          <option key={status} value={status} className="bg-white text-slate-900 font-medium">
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right space-x-1">
                     <button onClick={() => setPreviewQuote(quote)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="Ver Orçamento"><Eye size={18} /></button>
@@ -172,11 +204,9 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
         </div>
       </div>
 
-      {/* MODAL DE PREVIEW - CÓPIA DO LINK PÚBLICO */}
       {previewQuote && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
           <div className="bg-slate-100 rounded-3xl w-full max-w-5xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            
             <div className="bg-white p-4 border-b border-slate-200 flex justify-between items-center shrink-0">
                <div className="flex items-center space-x-3">
                   <div className="bg-indigo-600 p-2 rounded-lg text-white"><Eye size={20} /></div>
@@ -191,18 +221,15 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-12 bg-slate-200/50">
-               {/* Folha A4 Digital no Modal */}
                <div className="bg-white mx-auto w-full max-w-[210mm] shadow-xl p-12 md:p-20 min-h-[297mm] rounded-sm">
-                  
-                  {/* Header */}
                   <div className="flex justify-between items-start mb-12">
                     <div className="space-y-1">
-                      <h1 className="text-3xl font-black text-indigo-600 tracking-tight leading-none mb-4">{getProfile().studioName || getProfile().name}</h1>
+                      <h1 className="text-3xl font-black text-indigo-600 tracking-tight leading-none mb-4">{profile?.studioName || profile?.name || currentUser.name}</h1>
                       <div className="text-slate-500 text-[13px] leading-relaxed">
-                        <p>{getProfile().name}</p>
-                        <p>CNPJ/CPF: {getProfile().taxId}</p>
-                        <p>{getProfile().phone}</p>
-                        <p>{getProfile().address}</p>
+                        <p>{profile?.name || currentUser.name}</p>
+                        <p>CNPJ/CPF: {profile?.taxId || '---'}</p>
+                        <p>{profile?.phone}</p>
+                        <p>{profile?.address}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -217,7 +244,6 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
 
                   <div className="h-px bg-slate-100 w-full mb-10"></div>
 
-                  {/* Grid Cliente/Status */}
                   <div className="flex justify-between mb-12">
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Cliente</h3>
@@ -233,7 +259,6 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                     </div>
                   </div>
 
-                  {/* Tabela */}
                   <table className="w-full mb-10 text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-100">
@@ -256,7 +281,6 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                     </tbody>
                   </table>
 
-                  {/* Totais */}
                   <div className="flex flex-col items-end pt-6 border-t border-slate-50 mb-16">
                      <div className="flex justify-between w-64 text-sm text-slate-400 mb-2">
                         <span>Subtotal</span>
@@ -268,7 +292,6 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                      </div>
                   </div>
 
-                  {/* Pagamento */}
                   <div className="space-y-4 mb-12">
                     <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Pagamento</h3>
                     <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl text-[13px] text-slate-600">
@@ -277,10 +300,9 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                     </div>
                   </div>
 
-                  {/* Assinatura */}
                   <div className="mt-auto pt-10">
                     <div className="w-64 border-b border-slate-200 mb-2"></div>
-                    <p className="text-sm font-bold text-slate-800">{getProfile().name}</p>
+                    <p className="text-sm font-bold text-slate-800">{profile?.name || currentUser.name}</p>
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assinatura do Fotógrafo</p>
                   </div>
                </div>
