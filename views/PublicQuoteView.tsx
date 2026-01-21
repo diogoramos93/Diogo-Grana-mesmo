@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Quote, PhotographerProfile, Client, QuoteStatus } from '../types';
+import { Quote, PhotographerProfile, Client, QuoteStatus, ServiceType, PaymentMethod } from '../types';
 import { Download, CheckCircle, ShieldCheck, Loader2 } from 'lucide-react';
 import { generateQuotePDF } from '../services/pdfService';
 import { supabase } from '../lib/supabase';
@@ -21,9 +21,21 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Busca Perfil
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
-        if (profileData) setProfile(profileData);
+        // 1. Busca Perfil do Fotógrafo e mapeia tax_id -> taxId
+        const { data: pData } = await supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle();
+        if (pData) {
+          setProfile({
+            name: pData.name || '',
+            studioName: pData.studio_name || '',
+            taxId: pData.tax_id || '', // Correção do mapeamento
+            phone: pData.phone || '',
+            whatsapp: pData.whatsapp || '',
+            email: pData.email || '',
+            address: pData.address || '',
+            defaultTerms: pData.default_terms || '',
+            monthlyGoal: Number(pData.monthly_goal) || 5000
+          });
+        }
 
         // 2. Busca Orçamento e itens
         const { data: quoteData, error: qError } = await supabase
@@ -34,25 +46,41 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
         
         if (qError || !quoteData) throw new Error('Não encontrado');
         
-        // Formata os nomes das colunas vindas do snake_case do Postgres para o camelCase do TS
         const formattedQuote: Quote = {
           ...quoteData,
           clientId: quoteData.client_id,
           validUntil: quoteData.valid_until,
-          paymentMethod: quoteData.payment_method,
+          paymentMethod: quoteData.payment_method as PaymentMethod,
           paymentConditions: quoteData.payment_conditions,
-          extraFees: quoteData.extra_fees,
-          items: quoteData.items.map((i: any) => ({
-            ...i,
-            unitPrice: i.unit_price
+          extraFees: Number(quoteData.extra_fees) || 0,
+          discount: Number(quoteData.discount) || 0,
+          total: Number(quoteData.total) || 0,
+          items: (quoteData.items || []).map((i: any) => ({
+            id: i.id,
+            name: i.name,
+            description: i.description || '',
+            unitPrice: Number(i.unit_price) || 0,
+            quantity: Number(i.quantity) || 1,
+            type: i.type as ServiceType
           }))
         };
 
         setQuote(formattedQuote);
 
-        // 3. Busca Cliente
-        const { data: clientData } = await supabase.from('clients').select('*').eq('id', quoteData.client_id).single();
-        if (clientData) setClient(clientData);
+        // 3. Busca Dados do Cliente e mapeia tax_id -> taxId
+        const { data: cData } = await supabase.from('clients').select('*').eq('id', quoteData.client_id).single();
+        if (cData) {
+          setClient({
+            id: cData.id,
+            name: cData.name,
+            email: cData.email || '',
+            phone: cData.phone || '',
+            taxId: cData.tax_id || '', // Correção do mapeamento
+            address: cData.address || '',
+            type: cData.type as 'PF' | 'PJ',
+            notes: cData.notes || ''
+          });
+        }
 
         // Marca como visualizado se estiver como enviado ou rascunho
         if (formattedQuote.status === QuoteStatus.SENT || formattedQuote.status === QuoteStatus.DRAFT) {
@@ -141,7 +169,7 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
               </h1>
               <div className="text-[14px] text-[#475569] space-y-0.5">
                 <p className="font-semibold text-slate-800">{profile.name}</p>
-                <p>CNPJ/CPF: {profile.taxId}</p>
+                <p>CNPJ/CPF: {profile.taxId || '---'}</p>
                 <p>{profile.address}</p>
                 <p>{profile.phone}</p>
               </div>
