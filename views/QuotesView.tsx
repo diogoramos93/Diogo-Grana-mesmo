@@ -304,7 +304,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, setQuotes, clients, cur
                   <div className="mt-auto pt-10">
                     <div className="w-64 border-b border-slate-200 mb-2"></div>
                     <p className="text-sm font-bold text-slate-800">{profile?.name || currentUser.name}</p>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assinatura do Fotógrafo</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Assinatura</p>
                   </div>
                </div>
             </div>

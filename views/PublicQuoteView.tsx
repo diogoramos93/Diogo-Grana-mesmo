@@ -232,7 +232,7 @@ const PublicQuoteView: React.FC<PublicQuoteViewProps> = ({ quoteId, userId }) =>
             <div className="flex flex-col justify-end items-start md:items-end">
               <div className="w-full max-w-xs border-t-2 border-[#1e293b] pt-4">
                 <p className="text-[18px] font-black text-[#1e293b] leading-tight">{profile.name}</p>
-                <p className="text-[11px] font-bold text-[#94a3b8] uppercase tracking-[2px] mt-1">Assinatura Digital FocusQuote</p>
+                <p className="text-[11px] font-bold text-[#94a3b8] uppercase tracking-[2px] mt-1">Assinatura</p>
               </div>
             </div>
           </div>

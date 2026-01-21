@@ -183,7 +183,7 @@ export const generateQuotePDF = async (quote: Quote, profile: PhotographerProfil
   doc.setFontSize(7);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
-  doc.text('ASSINATURA DO FOTÓGRAFO', startX, currentY);
+  doc.text('ASSINATURA', startX, currentY);
 
   doc.save(`Orcamento_${quote.number}_${client.name.replace(/\s+/g, '_')}.pdf`);
 };
